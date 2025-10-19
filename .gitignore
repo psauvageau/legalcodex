@@ -1,0 +1,14 @@
+**/__pycache__/
+*.pyc
+
+.coverage
+*.egg-info/
+.pytest_cache/
+
+.venv*/
+
+htmlcov/
+
+
+
+api_key.json
