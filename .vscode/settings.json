@@ -3,6 +3,8 @@
     "python.testing.pytestEnabled": true,
     "files.exclude": {
         ".coverage": true,
-        "**/*.egg-info": true
-    }
+        "**/*.egg-info": true,
+        ".venv/": true
+    },
+    "files.trimTrailingWhitespace": true
 }

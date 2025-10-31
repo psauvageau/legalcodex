@@ -5,17 +5,15 @@ from typing import List, Type, Iterable, Optional, Generator
 from ._cli.cli_cmd import CliCmd
 from ._cli import cmd_test
 
-
 COMMANDS :List[Type[CliCmd]] = [
     cmd_test.CommandTest,
 ]
 
 
-
 def main()->None:
     """
     Main entry point for the LegalCodex CLI tool.
-    """                               
+    """
     args: argparse.Namespace = _create_parser(COMMANDS).parse_args()
 
     init_log(args.verbose)
@@ -37,6 +35,7 @@ def _create_parser(cmds:List[Type[CliCmd]]) -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
+    parser.add_argument('--config', '-c',action="store", type=str, default=None, help='Path to the config file')
     parser.add_argument('--verbose', '-v',action="store_true", help='Enable verbose output')
     parser.add_argument('--test',    '-t',action="store_true", help='Set Test Mode')
 
@@ -54,26 +53,26 @@ def _create_parser(cmds:List[Type[CliCmd]]) -> argparse.ArgumentParser:
 def init_log(verbose:bool)->None:
     """
     Initialize the logging configuration.
-    
+
     Args:
         verbose (bool): If True, set logging level to DEBUG, otherwise INFO.
     """
     if verbose:
         level = logging.DEBUG
-        
+
     else:
         level = logging.INFO
 
-    format = "%(levelname)-8s - %(name)s - %(message)s"
+    format = "%(levelname)-8s - %(name)-20s - %(message)s"
 
     logging.basicConfig(level=level, format=format)
 
-    silence = ["httpx", 
-               "google_genai.models", 
+    silence = ["httpx",
+               "google_genai.models",
                "httpcore"]
-    
+
     for name in silence:
         logging.getLogger(name).setLevel(logging.WARNING)
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     main()
