@@ -75,9 +75,9 @@ def get_sub_element_text(  element: ET.Element,
         if default is _undef:
             raise ValueError(f'Element missing required sub-element: "{name}" in "{element.tag}"')
         return default #type: ignore[return-value]
-    return _clean_text(sub_element.text)
+    return clean_text(sub_element.text)
 
-def _clean_text(text: str) -> str:
+def clean_text(text: str) -> str:
     """
     Clean up text by removing newlines and extra spaces.
     """
