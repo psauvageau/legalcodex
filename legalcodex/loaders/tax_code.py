@@ -36,8 +36,14 @@ def load_tax_code(file_name: str = FILE) -> Document:
     """
     # Parse the XML file
     loader = TaxCodeLoader(file_name=file_name)
-    if 1:
+    if 0:
         loader.body.dbg_print()
+
+    print("Saving:")
+    with open(r".work\tax_code_dump.txt", "w", encoding="utf-8") as f:
+        for line in loader.body.to_lines(0):
+            f.write(line + "\n")
+
     return Document("")
 
 
@@ -141,72 +147,77 @@ class BodyBlock(CompositeBlock):
 
 
 class HeadingBlock(CompositeBlock):
-    label:str
-    title:str
+    _label:str
+    _title:str
 
     def __init__(self, element: ET.Element )->None:
         super().__init__()
         assert element.tag == 'Heading'
-        level:int = xml.get_attribute(          element, 'level', int)
-        label:str = xml.get_sub_element_text(   element, 'Label', default='')
-        title:str = xml.get_sub_element_text(   element, 'TitleText')
-        self.level = level
-        self.label = label
-        self.title = title
+        self.level = xml.get_attribute(          element, 'level', int)
+        self._label = xml.get_sub_element_text(   element, 'Label', default='')
+        self.title = xml.get_sub_element_text(   element, 'TitleText')
 
     def to_lines(self, indent:int) -> Generator[str, None, None]:
         indent_str = self.get_indent_string(indent)
-        if self.label:
-            yield f"{indent_str}{self.label} : {self.title}"
+        if self._label:
+            yield f"{indent_str}{self._label} : {self.title}"
         else:
             yield f"{indent_str}{self.title}"
         yield from super().to_lines(indent)
 
 
 class SectionBlock(CompositeBlock):
-    _VALID_TAGS = set(['Section', 'Subsection', 'Paragraph', 'Subparagraph', "Subclause", "Clause", "Provision","ReadAsText"])
+    #_VALID_TAGS = set(['Section', 'Subsection', 'Subsubclause','Paragraph', 'Subparagraph', "Subclause", "Clause", "Provision","ReadAsText","SectionPiece"])
 
     label : str
+    _tag:str
 
 
     def __init__(self, element: ET.Element, level:int)->None:
         super().__init__()
+        self.level = level
+        self._tag = element.tag
         self.label = ""
-        assert element.tag in SectionBlock._VALID_TAGS
+        #assert element.tag in SectionBlock._VALID_TAGS
+        self._marginal_notes: List[SectionBlock] = []
 
         def _null(elem: ET.Element) -> None:
             pass
 
         tags_parsers :xml.TagParsers = {
-            "Section"      : self._parse_sub_bloc,
-            "Label"        : self._parse_label,
-            "Text"         : self._parse_text,
-            "Subsection"   : self._parse_sub_bloc,
-            "Paragraph"    : self._parse_sub_bloc,
-            "Subparagraph" : self._parse_sub_bloc,
-            "Clause"       : self._parse_sub_bloc,
-            "Subclause"    : self._parse_sub_bloc,
-            "Provision"    : self._parse_sub_bloc,
-            "ReadAsText"   : self._parse_sub_bloc,
+            "Section"                   : self._parse_sub_bloc,
 
+            "Subsection"                : self._parse_sub_bloc,
+            "Paragraph"                 : self._parse_sub_bloc,
+            "Subparagraph"              : self._parse_sub_bloc,
+            "Clause"                    : self._parse_sub_bloc,
+            "Subclause"                 : self._parse_sub_bloc,
+            "Subsubclause"              : self._parse_sub_bloc,
+            "Provision"                 : self._parse_sub_bloc,
+            "ReadAsText"                : self._parse_sub_bloc,
+            "SectionPiece"              : self._parse_sub_bloc,
+            "ContinuedSubclause"        : self._parse_sub_bloc,
+
+            "ContinuedSectionSubsection": self._parse_sub_bloc,
+            "ContinuedSubparagraph"     : self._parse_sub_bloc,
+            "ContinuedParagraph"        : self._parse_sub_bloc,
+            "ContinuedClause"           : self._parse_sub_bloc,
+
+            "Label"                     : self._parse_label,
+            "Text"                      : self._parse_text,
+            "MarginalNote"              : self._parse_MarginalNote,
 
             "HistoricalNote": _null,
-            "MarginalNote"  : _null,
+
             "Definition": _null,
-
-            "ContinuedSectionSubsection": _null,
-            "ContinuedSubparagraph": _null,
-            "ContinuedParagraph": _null,
-            "ContinuedClause": _null,
-
-            "ContinuedSubclause": _null,
-
-            "Subsubclause": _null,
-            "SectionPiece": _null,
 
             "FormulaGroup": _null,
             "FormulaDefinition": _null,
             "FormulaParagraph": _null,
+            "XRefExternal": _null,
+            "DefinitionRef": _null,
+            "DefinedTermFr": _null,
+            "Language": _null,
         }
         for child in element:
             xml.parse_element(child, tags_parsers)
@@ -225,6 +236,10 @@ class SectionBlock(CompositeBlock):
     def _parse_text(self, element : ET.Element )->None:
         block = TextBlock(element)
         self._content.append(block)
+
+    def _parse_MarginalNote(self, element: ET.Element) -> None:
+        block = SectionBlock(element, level=self.level + 1)
+        self._marginal_notes.append(block)
 
 
     def to_lines(self, indent:int) -> Generator[str, None, None]:
