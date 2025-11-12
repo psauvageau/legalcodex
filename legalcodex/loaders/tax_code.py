@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from .document import Document
 from . import _xml_helper as xml
 
-#import parse_element, get_attribute, get_sub_element_text, TagParsers
+
 
 _logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ class SectionBlock(CompositeBlock):
         self._tag = element.tag
         self.label = ""
         #assert element.tag in SectionBlock._VALID_TAGS
-        self._marginal_notes: List[SectionBlock] = []
+        self._marginal_notes: List[Block] = []
 
         def _null(elem: ET.Element) -> None:
             pass
@@ -216,7 +216,7 @@ class SectionBlock(CompositeBlock):
             "FormulaParagraph": _null,
             "XRefExternal": _null,
             "DefinitionRef": _null,
-            "DefinedTermFr": _null,
+            #"DefinedTermFr": _null,
             "Language": _null,
         }
         for child in element:
@@ -238,7 +238,9 @@ class SectionBlock(CompositeBlock):
         self._content.append(block)
 
     def _parse_MarginalNote(self, element: ET.Element) -> None:
-        block = SectionBlock(element, level=self.level + 1)
+        assert element.tag == 'MarginalNote'
+
+        block = TextBlock(element)
         self._marginal_notes.append(block)
 
 
@@ -250,24 +252,128 @@ class SectionBlock(CompositeBlock):
 
 
 
+@dataclass
+class Reference:
+    type: str
+    link: str
+    text: str
+
+    def __str__(self)->str:
+        return f"{self.text} : {self.link} ({self.type})"
+
+@dataclass
+class Definition:
+    term: str
+    description: str
 
 
 class TextBlock(Block):
-    _text: str
+    _text        : str
+    _definition  : Definition
+    _references  : List[Reference]
+    _tag_parsers : xml.TagParsers
+    _repealed    : Optional[str] = None
+    _defined_terms: List[str]
+
+
 
     def __init__(self, element:ET.Element)->None:
-        assert element.tag == 'Text'
-        if element.text is None:
-            self._text = ''
-            _logger.warning("Empty text in Text element")
+        self._repealed = None
+        self._references = []
+        self._defined_terms = []
+
+        null = lambda e: None
+
+        self._tag_parsers : xml.TagParsers = {
+            "Text":             null,
+            "XRefExternal":     self._add_reference,
+
+            "Repealed":         self._repealed_notice,
+            "DefinedTermFr":    self._definition_notice,
+            "DefinitionRef":    self._definition_notice,
+            "XRefInternal":     self._add_reference,
+
+            "Emphasis":         null,
+            "Sup":              null,
+            "Language":         null,
+
+            "MarginalNote":     null,
+            "HistoricalNote":   null,
+        }
+
+        text = ''.join(self._get_text_rec(element))
+        if text:
+            self._text = xml.clean_text(text)
         else:
-            self._text = xml.clean_text(element.text)
+            _logger.warning("Empty text in Text element")
+
+    def _get_text_rec(self, element: ET.Element) -> Generator[str, None, None]:
+        """
+        Recursively get the text of an element including its child elements
+        """
+
+        def _null(elem: ET.Element) -> None:
+            _logger.warning("Ignoring unknown tag in TextBlock: %s", elem.tag)
+
+
+        self._tag_parsers.get(element.tag, _null)(element)
+
+        if element.text:
+            yield element.text
+        for child in element:
+            yield from self._get_text_rec(child)
+            if child.tail:
+                yield child.tail
 
     def to_lines(self, indent:int)->Generator[str,None,None]:
         indent_str = self.get_indent_string(indent)
-
         for line in _dbg_text_to_80_columns(self._text):
             yield f"{indent_str}{line}"
+
+        if self._repealed:
+            yield ""
+            yield f"{indent_str}REPEALED: {self._repealed}"
+
+        if self._references:
+            yield ""
+            yield f"{indent_str}References:"
+            indent_str = self.get_indent_string(indent+1)
+            for ref in self._references:
+                yield indent_str + str(ref)
+
+        if self._defined_terms:
+            yield ""
+            yield f"{indent_str}Defined Terms:"
+            indent_str = self.get_indent_string(indent+1)
+            for term in self._defined_terms:
+                yield indent_str + term
+
+    def _add_reference(self, element: ET.Element) -> None:
+
+        type_:str = xml.get_attribute(element, 'reference-type', str, default="--")
+        link = xml.get_attribute(element, 'link', str, default="--")
+        text = element.text or ''
+        reference = Reference(type=type_, link=link, text=xml.clean_text(text))
+        self._references.append(reference)
+
+    def _repealed_notice(self, element: ET.Element) -> None:
+        assert self._repealed is None
+        self._repealed = element.text or ''
+        assert len(element) == 0, "Non-empty Repealed element"
+
+
+    def _definition_notice(self, element: ET.Element) -> None:
+
+        accepted = {"Emphasis",
+                    }
+
+
+        self._defined_terms.append(element.text or '--')
+        if len(element) != 0:
+            for child in element:
+                if child.tag not in accepted:
+                    _logger.warning('Non-empty DefinedTermFr element : "%s" - "%s"', child.tag, child.text or '--')
+
 
 
 

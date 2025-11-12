@@ -31,6 +31,8 @@ def parse_element(element    : ET.Element,
         parse_function(element)
     else:
         _logger.warning("Unknown tag: %s", element.tag)
+        full_text = ET.tostring(element, encoding='unicode')
+        _logger.warning('Full element text: "%s"', full_text)
 
 
 
