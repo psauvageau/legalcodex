@@ -3,28 +3,38 @@ import unittest
 
 import xml.etree.ElementTree as ET
 
-from legalcodex.loaders.tax_code import TextBlock
+from legalcodex.loaders.tax_code import TextBlock, SimpleTextBlock
 
+XML_TEXT = """
+    <Text>
+        begin
+        <DefinedTermFr>
+            defined_fr
+        </DefinedTermFr>
+        middle
+            <Sup>
+            sup
+            <Language>
+                lang
+            </Language>
+            </Sup>
+        <DefinitionRef>
+            defined_en
+            <Text>
+                defined_en_inner
+            </Text>
+        </DefinitionRef>
+        end
+    </Text>
+"""
 
+expected_text = "begin defined_fr middle sup lang defined_en defined_en_inner end"
 
-
-class TestTextBlock(unittest.TestCase):
-
-
-
+class TestSimpleTextBlock(unittest.TestCase):
     def test_textblock_preserves_inner_tags(self)->None:
 
-        xml_str = "<Text>begin<DefinedTermFr>defined</DefinedTermFr>end</Text>"
+        element = ET.fromstring(XML_TEXT)
+        text_block = SimpleTextBlock(element)
+        text = text_block.text
 
-        el = ET.fromstring(xml_str)
-        tb = TextBlock(el)
-
-        t = el.text
-
-
-        aa=0
-        # The parsed text should include the inline tag serialization
-        self.assertTrue( '<DefinedTermFr>' in tb._text)
-        # And the inner text content should be present
-        #assert 'defined' in tb._text
-        #assert tb._text == "begin<DefinedTermFr>defined</DefinedTermFr>end"
+        self.assertEqual(text, expected_text)

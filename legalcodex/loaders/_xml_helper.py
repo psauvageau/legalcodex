@@ -2,13 +2,14 @@ from __future__ import annotations
 """
 Helper functions for XML parsing.
 """
-from typing import List, Optional, Callable, Dict, TypeVar, Union
+from typing import Optional, Callable, TypeVar, Union, Generator
 import xml.etree.ElementTree as ET
 import logging
 
+DBG_RAISE_ON_UNKNOWN_TAG :bool = False
 
 TagParser  = Callable[[ET.Element],None]
-TagParsers = Dict[str,TagParser]
+TagParsers = dict[str,TagParser]
 
 _AttributeType = TypeVar('_AttributeType')
 class _Undef:
@@ -37,7 +38,7 @@ def parse_element(element    : ET.Element,
 
 
 
-def get_attribute( element : ET.Element,
+def get_attribute( element  : ET.Element,
                     name    : str,
                     type_   : Callable[[str],_AttributeType],
                     default : Union[_AttributeType, _Undef] = _undef
@@ -79,6 +80,52 @@ def get_sub_element_text(  element: ET.Element,
         return default #type: ignore[return-value]
     return clean_text(sub_element.text)
 
+
+
+
+def _warn_unknown_tag(element: ET.Element) -> None:
+    _logger.warning('Ignoring unknown tag "%s": %s', element.tag, ET.tostring(element, encoding='unicode'))
+    if DBG_RAISE_ON_UNKNOWN_TAG:
+        raise ValueError(f'Unknown tag: "{element.tag}"')
+
+
+def get_full_text(element: ET.Element,
+                  tag_parsers: TagParsers,
+                  default_parser: TagParser = _warn_unknown_tag
+                  ) -> Generator[str, None, None]:
+    """
+    Recursively get the text of an element including its child elements
+    """
+    if element.text:
+        yield element.text
+    for child in element:
+        yield from _get_full_text_recursive(child, tag_parsers, default_parser)
+
+
+
+def _get_full_text_recursive(element: ET.Element,
+                            tag_parsers: TagParsers,
+                            default_parser: TagParser = _warn_unknown_tag
+                            ) -> Generator[str, None, None]:
+    """
+    Recursively get the text of an element including its child elements
+    """
+    parser = tag_parsers.get(element.tag, default_parser)
+    parser(element)
+
+    if element.text:
+        yield element.text
+    for child in element:
+        yield from _get_full_text_recursive(child, tag_parsers)
+        if child.tail:
+            yield child.tail
+    if element.tail:
+        yield element.tail
+
+
+
+
+
 def clean_text(text: str) -> str:
     """
     Clean up text by removing newlines and extra spaces.
@@ -86,3 +133,4 @@ def clean_text(text: str) -> str:
     text = text.replace('\n', ' ')
     text = ' '.join(text.split())
     return text.strip()
+

@@ -7,21 +7,19 @@ import os
 import copy
 from abc import ABC, abstractmethod
 
-from typing import List, Optional   , Dict, Callable, TypeVar, Union, Any, Generator
+from typing import Optional, Callable, TypeVar, Union, Any, Generator, Sequence
 from dataclasses import dataclass
 
 import xml.etree.ElementTree as ET
 
 from .document import Document
 from . import _xml_helper as xml
-
-
+from .._misc import dbg_text_to_80_columns
 
 _logger = logging.getLogger(__name__)
 
 FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "I-3.3.xml"))
 assert os.path.isfile(FILE), f"Tax code file not found: {FILE}"
-
 
 
 def load_tax_code(file_name: str = FILE) -> Document:
@@ -85,10 +83,23 @@ class Block(ABC):
         return f"B: {self.level} {str(type(self))}"
 
 
+    def _yield_sub_elements_text(self, name: str,
+                                       blocks: Sequence[Block],
+                                       indent:int) -> Generator[str,None,None]:
+        if blocks:
+            indent_str = self.get_indent_string(indent)
+            yield f"{indent_str}============================================"
+            yield ""
+            yield f"{indent_str}{name}"
+            for block in blocks:
+                yield from block.to_lines(indent + 1)
+            yield f"{indent_str}============================================"
+
+
 
 
 class CompositeBlock(Block):
-    _content : List[Block]
+    _content : list[Block]
 
     def __init__(self)->None:
         self._content = []
@@ -102,7 +113,7 @@ class CompositeBlock(Block):
 
 
 class BodyBlock(CompositeBlock):
-    _heading_stack : List[CompositeBlock]
+    _heading_stack : list[CompositeBlock]
 
     def __init__(self, body: ET.Element)->None:
         super().__init__()
@@ -167,21 +178,23 @@ class HeadingBlock(CompositeBlock):
 
 
 class SectionBlock(CompositeBlock):
-    #_VALID_TAGS = set(['Section', 'Subsection', 'Subsubclause','Paragraph', 'Subparagraph', "Subclause", "Clause", "Provision","ReadAsText","SectionPiece"])
-
     label : str
     _tag:str
 
+    _historical_notes : list[Block]
+    _marginal_notes: list[Block]
+    _definitions : list[Block]
 
     def __init__(self, element: ET.Element, level:int)->None:
         super().__init__()
         self.level = level
         self._tag = element.tag
         self.label = ""
-        #assert element.tag in SectionBlock._VALID_TAGS
-        self._marginal_notes: List[Block] = []
+        self._marginal_notes = []
+        self._historical_notes = []
+        self._definitions = []
 
-        def _null(elem: ET.Element) -> None:
+        def _null(element: ET.Element) -> None:
             pass
 
         tags_parsers :xml.TagParsers = {
@@ -207,9 +220,9 @@ class SectionBlock(CompositeBlock):
             "Text"                      : self._parse_text,
             "MarginalNote"              : self._parse_MarginalNote,
 
-            "HistoricalNote": _null,
+            "HistoricalNote"            : self._parse_historical_note,
 
-            "Definition": _null,
+            "Definition": self._parse_definition,
 
             "FormulaGroup": _null,
             "FormulaDefinition": _null,
@@ -240,121 +253,146 @@ class SectionBlock(CompositeBlock):
     def _parse_MarginalNote(self, element: ET.Element) -> None:
         assert element.tag == 'MarginalNote'
 
-        block = TextBlock(element)
+        block = MarginalNoteBlock(element)
         self._marginal_notes.append(block)
+
+    def _parse_historical_note(self, element: ET.Element) -> None:
+        self._historical_notes.append(HistoricalNoteBlock(element))
+
+    def _parse_definition(self, element: ET.Element) -> None:
+        self._definitions.append(DefinitionBlock(element))
 
 
     def to_lines(self, indent:int) -> Generator[str, None, None]:
         indent_str = self.get_indent_string(indent)
         if self.label:
             yield f"{indent_str}{self.label}"
+
+        yield from self._yield_sub_elements_text("Marginal Notes", self._marginal_notes, indent)
+
         yield from super().to_lines(indent)
 
+        yield from self._yield_sub_elements_text("Historical Notes", self._historical_notes, indent)
+        yield from self._yield_sub_elements_text("Definitions", self._definitions, indent)
 
 
-@dataclass
-class Reference:
-    type: str
-    link: str
-    text: str
-
-    def __str__(self)->str:
-        return f"{self.text} : {self.link} ({self.type})"
-
-@dataclass
-class Definition:
-    term: str
-    description: str
 
 
-class TextBlock(Block):
-    _text        : str
-    _definition  : Definition
-    _references  : List[Reference]
-    _tag_parsers : xml.TagParsers
-    _repealed    : Optional[str] = None
-    _defined_terms: List[str]
-
-
+class SimpleTextBlock(Block):
+    _tag                : str
+    _text               : str
+    _historical_notes   : list[HistoricalNoteBlock]
 
     def __init__(self, element:ET.Element)->None:
-        self._repealed = None
-        self._references = []
-        self._defined_terms = []
+        self._text = ''
+        self._tag  = element.tag
+        self._historical_notes = []
 
-        null = lambda e: None
-
-        self._tag_parsers : xml.TagParsers = {
-            "Text":             null,
-            "XRefExternal":     self._add_reference,
-
-            "Repealed":         self._repealed_notice,
-            "DefinedTermFr":    self._definition_notice,
-            "DefinitionRef":    self._definition_notice,
-            "XRefInternal":     self._add_reference,
-
-            "Emphasis":         null,
-            "Sup":              null,
-            "Language":         null,
-
-            "MarginalNote":     null,
-            "HistoricalNote":   null,
-        }
-
-        text = ''.join(self._get_text_rec(element))
+        tag_parsers : xml.TagParsers = self.get_tag_parsers()
+        text = ''.join(xml.get_full_text(element,
+                                         tag_parsers))
         if text:
             self._text = xml.clean_text(text)
         else:
             _logger.warning("Empty text in Text element")
 
-    def _get_text_rec(self, element: ET.Element) -> Generator[str, None, None]:
-        """
-        Recursively get the text of an element including its child elements
-        """
+    def get_tag_parsers(self) -> xml.TagParsers:
+        return {
+            "Text":             null_parser,
+            "Emphasis":         null_parser,
+            "Sup":              null_parser,
+            "Language":         null_parser,
 
-        def _null(elem: ET.Element) -> None:
-            _logger.warning("Ignoring unknown tag in TextBlock: %s", elem.tag)
+            #"MarginalNote":     null_parser,
+            "HistoricalNote":   self._parse_historical_note,
+        }
 
 
-        self._tag_parsers.get(element.tag, _null)(element)
-
-        if element.text:
-            yield element.text
-        for child in element:
-            yield from self._get_text_rec(child)
-            if child.tail:
-                yield child.tail
+    @property
+    def text(self)->str:
+        return self._text
 
     def to_lines(self, indent:int)->Generator[str,None,None]:
         indent_str = self.get_indent_string(indent)
-        for line in _dbg_text_to_80_columns(self._text):
+        for line in dbg_text_to_80_columns(self._text):
             yield f"{indent_str}{line}"
+
+        if self._historical_notes:
+            yield ""
+            yield f"{indent_str}Historical Notes:"
+            for note in self._historical_notes:
+                yield from note.to_lines(indent + 1)
+
+
+    def _parse_historical_note(self, element: ET.Element) -> None:
+        self._historical_notes.append(HistoricalNoteBlock(element))
+
+
+class HistoricalNoteBlock(SimpleTextBlock):
+    def __init__(self, element: ET.Element)->None:
+        assert element.tag == 'HistoricalNote'
+        super().__init__(element)
+
+    def get_tag_parsers(self) -> xml.TagParsers:
+        return super().get_tag_parsers() | {
+            "HistoricalNoteSubItem": null_parser,
+        }
+
+
+
+class TextBlock(SimpleTextBlock):
+    #_definition  : list[Definition]
+    _references  : list[Block]
+    _repealed    : Optional[str] = None
+    _defined_terms: list[Block]
+    _marginal_notes : list[MarginalNoteBlock]
+
+    def __init__(self, element:ET.Element)->None:
+     #   self._definition    =  []
+        self._repealed      = None
+        self._references    = []
+        self._defined_terms = []
+        self._marginal_notes= []
+
+        super().__init__(element)
+
+    def get_tag_parsers(self) -> xml.TagParsers:
+
+        tag_parser = super().get_tag_parsers()
+
+        tag_parser.update({
+            "XRefExternal":     self._add_reference,
+            "XRefInternal":     self._add_reference,
+
+            "Repealed":         self._repealed_notice,
+            "DefinedTermFr":    self._definition_notice,
+            "DefinitionRef":    self._definition_notice,
+            "MarginalNote":     self._add_marginal_note,
+        })
+        return tag_parser
+
+
+
+    def to_lines(self, indent:int)->Generator[str,None,None]:
+
+        yield from super().to_lines(indent)
+
+        indent_str:str = self.get_indent_string(indent)
 
         if self._repealed:
             yield ""
             yield f"{indent_str}REPEALED: {self._repealed}"
 
-        if self._references:
-            yield ""
-            yield f"{indent_str}References:"
-            indent_str = self.get_indent_string(indent+1)
-            for ref in self._references:
-                yield indent_str + str(ref)
+        self._yield_sub_elements_text("References",     self._references,     indent)
+        self._yield_sub_elements_text("Defined Terms",  self._defined_terms,  indent)
+        self._yield_sub_elements_text("Marginal Notes", self._marginal_notes, indent)
 
-        if self._defined_terms:
-            yield ""
-            yield f"{indent_str}Defined Terms:"
-            indent_str = self.get_indent_string(indent+1)
-            for term in self._defined_terms:
-                yield indent_str + term
+
+
 
     def _add_reference(self, element: ET.Element) -> None:
-
-        type_:str = xml.get_attribute(element, 'reference-type', str, default="--")
-        link = xml.get_attribute(element, 'link', str, default="--")
-        text = element.text or ''
-        reference = Reference(type=type_, link=link, text=xml.clean_text(text))
-        self._references.append(reference)
+        block: Block = ReferenceBlock(element)
+        self._references.append(block)
 
     def _repealed_notice(self, element: ET.Element) -> None:
         assert self._repealed is None
@@ -364,34 +402,88 @@ class TextBlock(Block):
 
     def _definition_notice(self, element: ET.Element) -> None:
 
-        accepted = {"Emphasis",
-                    }
+        assert element.tag == 'DefinedTermFr' or element.tag == 'DefinitionRef'
+        block = SimpleTextBlock(element)
+        self._defined_terms.append(block)
+
+    def _add_marginal_note(self, element: ET.Element) -> None:
+        assert element.tag == 'MarginalNote'
+        block = MarginalNoteBlock(element)
+        self._marginal_notes.append(block)
+        _logger.warning("Parsed MarginalNote: %s", block.text)
 
 
-        self._defined_terms.append(element.text or '--')
-        if len(element) != 0:
-            for child in element:
-                if child.tag not in accepted:
-                    _logger.warning('Non-empty DefinedTermFr element : "%s" - "%s"', child.tag, child.text or '--')
+class MarginalNoteBlock(TextBlock):
+    def __init__(self, element: ET.Element)->None:
+        assert element.tag == 'MarginalNote'
+        super().__init__(element)
+
+
+class ReferenceBlock(SimpleTextBlock):
+    _type: str
+    _link: str
+
+    def __init__(self, element: ET.Element)->None:
+        assert element.tag == 'XRefExternal' or element.tag == 'XRefInternal'
+
+        self._type =  xml.get_attribute(element, 'reference-type', str, default="--")
+        self._link = xml.get_attribute(element, 'link', str, default="")
+        super().__init__(element)
+
+    def to_lines(self, indent: int) -> Generator[str, None, None]:
+        yield "Reference: {self._type} : {self._link}"
+        yield from super().to_lines(indent)
+
+
+class DefinitionBlock(Block):
+    _text:str
+    _terms : list[str]
+
+    def __init__(self, element: ET.Element)->None:
+        assert element.tag == 'Definition'
+        self._terms  = []
+
+        tag_parsers : xml.TagParsers = {
+            "Text":             self._parse_text,
+            "Paragraph":        null_parser,
+            "ContinuedDefinition": null_parser,
+
+
+            "FormulaGroup":   null_parser,
+            "FormulaDefinition":   null_parser,
+            "Provision":   null_parser,
+
+
+        }
+
+        for child in element:
+            xml.parse_element(child, tag_parsers)
+
+    def _parse_text(self, element: ET.Element) -> None:
+        assert element.tag == 'Text'
+        for child in element:
+            if child.tag == 'DefinedTermFr':
+                term = xml.clean_text(child.text or '')
+                self._terms.append(term)
 
 
 
 
 
+    def to_lines(self, indent:int) -> Generator[str, None, None]:
+        indent_str = self.get_indent_string(indent)
+        #yield f"{indent_str}Definition Block TODO"
+        #assert self._terms
 
-def _dbg_text_to_80_columns(text:str)->Generator[str,None,None]:
-    """
-    Split text into lines of max 80 columns for debugging output.
-    """
-    words = text.split()
-    current_line = ""
-    for word in words:
-        if len(current_line) + len(word) + 1 <= 80:
-            if current_line:
-                current_line += " "
-            current_line += word
-        else:
-            yield current_line
-            current_line = word
-    if current_line:
-        yield current_line
+        line =  f"{indent_str}Definitions: {', '.join(self._terms)}"
+
+        if len(self._terms) > 1:
+            _logger.warning("Definition with multiple terms:")
+            for term in self._terms:
+                _logger.warning(" - %s", term)
+            print()
+
+        yield line
+
+def null_parser(element: ET.Element) -> None:
+    pass
