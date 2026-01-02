@@ -3,7 +3,7 @@ import sys
 import os
 import logging
 import xml.etree.ElementTree as ET
-from typing import Set, Generator, Optional, Callable, Iterable
+from typing import Set, Generator, Optional, Callable, Iterable, Final
 from abc import abstractmethod, ABC
 
 _logger = logging.getLogger()
@@ -24,6 +24,9 @@ class Block(ABC):
     _BLOCKS        : dict[str, Optional[BLOCK_CTOR]] = {}
     _DEFAULT_BLOCK : Optional[BLOCK_CTOR] = None
     _TEXT          : bool = False
+
+    elem: ET.Element
+    level:Final[int]
 
     def __init__(self, elem:ET.Element, level:int)->None:
         self.elem = elem
@@ -51,7 +54,7 @@ class Block(ABC):
 
     def children(self)->Generator[Block,None,None]:
         try:
-            for child in self.elem:
+            for child in self._child_elements():
                 sub_block = self._get_block(child)
                 if sub_block:
                     yield sub_block
@@ -65,7 +68,8 @@ class Block(ABC):
             return None
         return block_constructor(elem, self.level+1)
 
-
+    def _child_elements(self)->Generator[ET.Element,None,None]:
+        yield from self.elem
 
 class _unsupported(Block):
     def __init__(self, elem: ET.Element, level:int)->None:
@@ -104,7 +108,7 @@ class _TextBlock(Block):
 
     def __init__(self, elem: ET.Element, level:int)->None:
         super().__init__(elem, level)
-        self._text = list(_full_test(elem))
+        self._text = list(_full_text(elem))
 
     def __str__(self) -> str:
         return self._formatted_text()
@@ -115,20 +119,16 @@ class _TextBlock(Block):
         lines = _word_wrap(self._text, max_column - len(indent))
         if VERBOSE:
             lines = ["  " + l for l in lines ]
-            lines = [f"<{self.tag}>]"] + lines + [f"</{self.tag}>"]
+            lines = [f"<{self.tag}>"] + lines + [f"</{self.tag}>"]
         return "\n".join(f"{indent}{line}" for line in lines)
-
-
-
-
 
 
 class Heading(_LabelledBlock):
     title: Optional[str]
-    _BLOCKS = _LabelledBlock._BLOCKS.copy()
-    _BLOCKS.update({
+    _BLOCKS = {
+            "Label":        None,
             "TitleText":    None,
-        })
+        }
 
     _DEFAULT_BLOCK = _unsupported
 
@@ -155,11 +155,11 @@ class Heading(_LabelledBlock):
 
 class Text(_TextBlock):
     _BLOCKS = {
-        "DefinedTermEn":        None,
+        "Language":             None,
         "DefinedTermFr":        None,
+        "DefinedTermEn":        None,
         "DefinitionRef":        None,
         "Emphasis":             None,
-        "Language":             None,
         "LeaderRightJustified": None,
         "Repealed":             None,
         "Sup":                  None,
@@ -265,9 +265,17 @@ class ReadAsText(Block):
     }
 
 
+
+class HistoricalNoteSubItem(_TextBlock):
+    _BLOCKS = {
+        "Sup":None,
+    }
+
 class HistoricalNote(_TextBlock):
     _BLOCKS = {
-        "HistoricalNoteSubItem":None,
+        "HistoricalNoteSubItem":HistoricalNoteSubItem,
+
+
     }
 
 class Subsubclause(_LabelledBlock):
@@ -354,14 +362,54 @@ class Provision(_LabelledBlock):
 
 
 class Definition(Block):
-   _DEFAULT_BLOCK = _unsupported
-   _BLOCKS = {
+
+    class TextDefinition(Block):
+        _TEXT = True
+        _DEFAULT_BLOCK = _unsupported
+
+        _term: str
+        _definition : str
+
+
+        def __init__(self, elem: ET.Element, level:int)->None:
+            super().__init__(elem, level)
+
+            self._sub_elements = list(self.elem)
+            assert len(self._sub_elements) > 0, "Definition missing sub-elements"
+            assert self._sub_elements[0].tag == "DefinedTermFr", "Definition first sub-element is not DefinedTermFr"
+
+            term_element = self._sub_elements[0]
+            self._term = _get_text(term_element)
+
+            definition :list[str] = [term_element.tail or ""]
+            for sub_elem in self._sub_elements[1:]:
+                definition.append(_get_text(sub_elem))
+
+                tail = (sub_elem.tail or "").strip()
+                if tail:
+                    definition.append(tail)
+
+            self._definition = " ".join(definition).strip()
+
+        def _child_elements(self)->Generator[ET.Element,None,None]:
+            yield from []
+
+        def __str__(self) -> str:
+            indent = self.indent
+            return f'{indent}Definition: "{self._term}"\n' +\
+                   "\n".join([f"{indent}  {line}"  for line in _word_wrap([self._definition])])
+
+
+
+
+    _DEFAULT_BLOCK = _unsupported
+    _BLOCKS = {
         "ContinuedDefinition": ContinuedDefinition,
         "FormulaDefinition": FormulaDefinition,
         "FormulaGroup": FormulaGroup,
         "Paragraph": Paragraph,
         "Provision": Provision,
-        "Text": Text,
+        "Text": TextDefinition,
    }
 
 
@@ -454,10 +502,6 @@ def walk(block:Block,
     for child in block.children():
         walk(child, f)
 
-
-
-
-
 class UnsupportedBlockError(Exception):
     parent_element : Optional[ET.Element] = None
 
@@ -466,38 +510,29 @@ class UnsupportedBlockError(Exception):
         assert self.parent_element is not None
         return ET.tostring(self.parent_element, encoding="unicode")
 
-
 def _get_text(elem: ET.Element)->str:
     """
     Check that an element has no text or tail text.
     """
     text = []
-
-
-
     if elem.text:
         text.append(elem.text)
-
 
     for child in elem:
         if child.tail:
             text.append(child.tail)
     return " ".join(text).strip()
 
-
-
-def _full_test(elem: ET.Element)->Iterable[str]:
+def _full_text(elem: ET.Element)->Iterable[str]:
     """
     Yield all text in an element, including tails.
     """
     if elem.text:
         yield elem.text
     for child in elem:
-        yield from _full_test(child)
+        yield from _full_text(child)
         if child.tail:
             yield child.tail
-
-
 
 
 def _word_wrap(text:Iterable[str], max_widht:int=80)->Iterable[str]:
@@ -519,12 +554,6 @@ def _word_wrap(text:Iterable[str], max_widht:int=80)->Iterable[str]:
                 current_line = word
     if current_line:
         yield current_line
-
-
-
-
-
-
 
 def _init_logger(verbose:bool)->None:
     ENCODING = "utf-8"
