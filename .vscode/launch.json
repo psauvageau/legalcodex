@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "walk",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/walk2.py",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "DBG",
             "type": "debugpy",
             "request": "launch",

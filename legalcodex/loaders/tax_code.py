@@ -6,11 +6,14 @@ import logging
 import os
 import copy
 from abc import ABC, abstractmethod
+import io
 
-from typing import Optional, Callable, TypeVar, Union, Any, Generator, Sequence
+from typing import Optional, Callable, TypeVar, Union, Any, Generator, Sequence, BinaryIO
 from dataclasses import dataclass
 
 import xml.etree.ElementTree as ET
+
+from legalcodex.loaders._xml_helper import TagParsers
 
 from .document import Document
 from . import _xml_helper as xml
@@ -20,6 +23,10 @@ _logger = logging.getLogger(__name__)
 
 FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "I-3.3.xml"))
 assert os.path.isfile(FILE), f"Tax code file not found: {FILE}"
+
+
+
+
 
 
 def load_tax_code(file_name: str = FILE) -> Document:
@@ -37,10 +44,13 @@ def load_tax_code(file_name: str = FILE) -> Document:
     if 0:
         loader.body.dbg_print()
 
-    print("Saving:")
-    with open(r".work\tax_code_dump.txt", "w", encoding="utf-8") as f:
-        for line in loader.body.to_lines(0):
-            f.write(line + "\n")
+
+    if 1:
+        file_name = r".work\tax_code_dump.txt"
+        print("Saving:",file_name)
+        with open(file_name, "w", encoding="utf-8") as f:
+            for line in loader.body.to_lines(0):
+                f.write(line + "\n")
 
     return Document("")
 
@@ -51,14 +61,16 @@ class TaxCodeLoader:
     body : BodyBlock
 
     def __init__(self, file_name:str = FILE)->None:
-        tree = ET.parse(file_name)
-        xml_root = tree.getroot()
+        with open(file_name, "rb") as f:
+            tree = ET.parse(f)
+            xml_root = tree.getroot()
 
-        #Find the <body> element and extract its text content
-        body = xml_root.find('Body')
-        if body is None:
-            raise ValueError("No <Body> element found in the XML document.")
-        self.body = BodyBlock(body)
+            #Find the <body> element and extract its text content
+            body = xml_root.find('Body')
+            if body is None:
+                raise ValueError("No <Body> element found in the XML document.")
+            self.body = BodyBlock(body)
+
 
 INVALID_LEVEL = -1
 
@@ -88,12 +100,12 @@ class Block(ABC):
                                        indent:int) -> Generator[str,None,None]:
         if blocks:
             indent_str = self.get_indent_string(indent)
-            yield f"{indent_str}============================================"
-            yield ""
+            #yield f"{indent_str}============================================"
+            #yield ""
             yield f"{indent_str}{name}"
             for block in blocks:
                 yield from block.to_lines(indent + 1)
-            yield f"{indent_str}============================================"
+            #yield f"{indent_str}============================================"
 
 
 
@@ -194,44 +206,7 @@ class SectionBlock(CompositeBlock):
         self._historical_notes = []
         self._definitions = []
 
-        def _null(element: ET.Element) -> None:
-            pass
-
-        tags_parsers :xml.TagParsers = {
-            "Section"                   : self._parse_sub_bloc,
-
-            "Subsection"                : self._parse_sub_bloc,
-            "Paragraph"                 : self._parse_sub_bloc,
-            "Subparagraph"              : self._parse_sub_bloc,
-            "Clause"                    : self._parse_sub_bloc,
-            "Subclause"                 : self._parse_sub_bloc,
-            "Subsubclause"              : self._parse_sub_bloc,
-            "Provision"                 : self._parse_sub_bloc,
-            "ReadAsText"                : self._parse_sub_bloc,
-            "SectionPiece"              : self._parse_sub_bloc,
-            "ContinuedSubclause"        : self._parse_sub_bloc,
-
-            "ContinuedSectionSubsection": self._parse_sub_bloc,
-            "ContinuedSubparagraph"     : self._parse_sub_bloc,
-            "ContinuedParagraph"        : self._parse_sub_bloc,
-            "ContinuedClause"           : self._parse_sub_bloc,
-
-            "Label"                     : self._parse_label,
-            "Text"                      : self._parse_text,
-            "MarginalNote"              : self._parse_MarginalNote,
-
-            "HistoricalNote"            : self._parse_historical_note,
-
-            "Definition": self._parse_definition,
-
-            "FormulaGroup": _null,
-            "FormulaDefinition": _null,
-            "FormulaParagraph": _null,
-            "XRefExternal": _null,
-            "DefinitionRef": _null,
-            #"DefinedTermFr": _null,
-            "Language": _null,
-        }
+        tags_parsers  = self.get_parsers()
         for child in element:
             xml.parse_element(child, tags_parsers)
 
@@ -262,18 +237,60 @@ class SectionBlock(CompositeBlock):
     def _parse_definition(self, element: ET.Element) -> None:
         self._definitions.append(DefinitionBlock(element))
 
+    def _parse_formula_group(self, element: ET.Element) -> None:
+        self._content.append(FormulaBlock(element))
+
 
     def to_lines(self, indent:int) -> Generator[str, None, None]:
         indent_str = self.get_indent_string(indent)
         if self.label:
             yield f"{indent_str}{self.label}"
 
-        yield from self._yield_sub_elements_text("Marginal Notes", self._marginal_notes, indent)
-
         yield from super().to_lines(indent)
+        yield from self._yield_sub_elements_text("Marginal Notes",  self._marginal_notes,   indent)
+        yield from self._yield_sub_elements_text("Historical Notes",self._historical_notes, indent)
+        yield from self._yield_sub_elements_text("Definitions",     self._definitions,      indent)
 
-        yield from self._yield_sub_elements_text("Historical Notes", self._historical_notes, indent)
-        yield from self._yield_sub_elements_text("Definitions", self._definitions, indent)
+    def get_parsers(self)->xml.TagParsers:
+
+
+        tags_parsers :xml.TagParsers = {
+            "Section"                   : self._parse_sub_bloc,
+
+            "Subsection"                : self._parse_sub_bloc,
+            "Paragraph"                 : self._parse_sub_bloc,
+            "Subparagraph"              : self._parse_sub_bloc,
+            "Clause"                    : self._parse_sub_bloc,
+            "Subclause"                 : self._parse_sub_bloc,
+            "Subsubclause"              : self._parse_sub_bloc,
+            "Provision"                 : self._parse_sub_bloc,
+            "ReadAsText"                : self._parse_sub_bloc,
+            "SectionPiece"              : self._parse_sub_bloc,
+            "ContinuedSubclause"        : self._parse_sub_bloc,
+
+            "ContinuedSectionSubsection": self._parse_sub_bloc,
+            "ContinuedSubparagraph"     : self._parse_sub_bloc,
+            "ContinuedParagraph"        : self._parse_sub_bloc,
+            "ContinuedClause"           : self._parse_sub_bloc,
+
+            "Label"                     : self._parse_label,
+            "Text"                      : self._parse_text,
+            "MarginalNote"              : self._parse_MarginalNote,
+
+            "HistoricalNote"            : self._parse_historical_note,
+
+            "Definition"                : self._parse_definition,
+
+            "FormulaGroup"              : self._parse_formula_group,
+            "FormulaDefinition": null_parser,
+            "FormulaParagraph"          : self._parse_sub_bloc,
+            "XRefExternal": null_parser,
+            "DefinitionRef": null_parser,
+            #"DefinedTermFr": null_parser,
+            "Language": null_parser,
+        }
+        return tags_parsers
+
 
 
 
@@ -297,6 +314,11 @@ class SimpleTextBlock(Block):
             _logger.warning("Empty text in Text element")
 
     def get_tag_parsers(self) -> xml.TagParsers:
+
+
+
+
+
         return {
             "Text":             null_parser,
             "Emphasis":         null_parser,
@@ -326,6 +348,24 @@ class SimpleTextBlock(Block):
 
     def _parse_historical_note(self, element: ET.Element) -> None:
         self._historical_notes.append(HistoricalNoteBlock(element))
+
+
+class FormulaBlock(Block):
+    _content :list[str]
+
+    def __init__(self, element: ET.Element)->None:
+        self._content = []
+        self._content= list(xml.get_full_text(element, tag_parsers={}, default_parser=null_parser))
+
+    def to_lines(self, indent:int) -> Generator[str,None,None]:
+        indent_str = self.get_indent_string(indent)
+        yield f"{indent_str}Formula:"
+        for line in self._content:
+            yield f"{indent_str}  {line}"
+
+
+
+
 
 
 class HistoricalNoteBlock(SimpleTextBlock):
@@ -440,50 +480,76 @@ class DefinitionBlock(Block):
     _terms : list[str]
 
     def __init__(self, element: ET.Element)->None:
+
+
         assert element.tag == 'Definition'
+        assert not bool(element.text.strip()), f'"Definition element should not have direct text "{element.text}"'
         self._terms  = []
 
+        self._text = " ".join(xml.get_full_text(element,tag_parsers={}, default_parser=null_parser))
+
+        #tag_parsers : xml.TagParsers = {
+        #    "Text":                 self._parse_text,
+#
+        #    "Paragraph":            null_parser,
+        #    "ContinuedDefinition":  null_parser,
+        #    "FormulaGroup":         null_parser,
+        #    "FormulaDefinition":    null_parser,
+        #    "Provision":            null_parser,
+        #}
+#
+        #for child in element:
+        #    xml.parse_element(child, tag_parsers)
+
+    def get_parsers(self) -> dict[str, Callable[[Element], None]]:
+        parent =  super().get_parsers()
+
         tag_parsers : xml.TagParsers = {
-            "Text":             self._parse_text,
-            "Paragraph":        null_parser,
-            "ContinuedDefinition": null_parser,
-
-
-            "FormulaGroup":   null_parser,
-            "FormulaDefinition":   null_parser,
-            "Provision":   null_parser,
-
-
+            "Text":                 self._parse_text,
+#
+            #"Paragraph":            null_parser,
+            #"ContinuedDefinition":  null_parser,
+            #"FormulaGroup":         null_parser,
+            #"FormulaDefinition":    null_parser,
+            #"Provision":            null_parser,
         }
+        return parent | tag_parsers
 
-        for child in element:
-            xml.parse_element(child, tag_parsers)
 
     def _parse_text(self, element: ET.Element) -> None:
         assert element.tag == 'Text'
+
+        first_child : Optional[ET.Element] = element[0]
+        assert first_child is not None
+        assert first_child.tag == 'DefinedTermFr', "Expected DefinedTermFr as first child of Definition Text"
+
         for child in element:
             if child.tag == 'DefinedTermFr':
                 term = xml.clean_text(child.text or '')
-                self._terms.append(term)
-
-
-
-
+                if term not in self._terms:
+                    self._terms.append(term)
+            elif child.tag == 'Repealed':
+                pass #TODO
+            else:
+                accepted = {"DefinedTermEn","Language","Sup", "DefinitionRef","XRefExternal" }
+                if child.tag not in accepted:
+                    _logger.warning("Unexpected tag in Definition Text: %s", child.tag)
 
     def to_lines(self, indent:int) -> Generator[str, None, None]:
         indent_str = self.get_indent_string(indent)
         #yield f"{indent_str}Definition Block TODO"
         #assert self._terms
 
-        line =  f"{indent_str}Definitions: {', '.join(self._terms)}"
-
-        if len(self._terms) > 1:
-            _logger.warning("Definition with multiple terms:")
-            for term in self._terms:
-                _logger.warning(" - %s", term)
-            print()
-
-        yield line
+        #line =  f"{indent_str}Definitions: {', '.join(self._terms)}"
+#
+        #if len(self._terms) > 1:
+        #    _logger.warning("Definition with multiple terms:")
+        #    for term in self._terms:
+        #        _logger.warning(" - %s", term)
+        #    print()
+#
+        #yield line
+        yield f"{indent_str}Definition: {self._text}"
 
 def null_parser(element: ET.Element) -> None:
     pass

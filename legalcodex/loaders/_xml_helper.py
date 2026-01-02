@@ -105,7 +105,7 @@ def get_full_text(element: ET.Element,
 
 def _get_full_text_recursive(element: ET.Element,
                             tag_parsers: TagParsers,
-                            default_parser: TagParser = _warn_unknown_tag
+                            default_parser: TagParser
                             ) -> Generator[str, None, None]:
     """
     Recursively get the text of an element including its child elements
@@ -116,7 +116,7 @@ def _get_full_text_recursive(element: ET.Element,
     if element.text:
         yield element.text
     for child in element:
-        yield from _get_full_text_recursive(child, tag_parsers)
+        yield from _get_full_text_recursive(child, tag_parsers, default_parser)
         if child.tail:
             yield child.tail
     if element.tail:
