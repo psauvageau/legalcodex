@@ -8,7 +8,7 @@ from abc import abstractmethod, ABC
 
 _logger = logging.getLogger()
 
-VERBOSE = False
+VERBOSE = True
 
 BLOCK_CTOR = Callable[[ET.Element, int],"Block"]
 
@@ -43,7 +43,11 @@ class Block(ABC):
         return "  " * self.level
 
     def __str__(self) -> str:
-        return f"{self.indent}<{self.tag}>"
+        s =  f"{self.indent}<{self.tag}>"
+        if VERBOSE:
+            if type(self) == Block:
+                _logger.warning(f"TODO:  {self.tag}")
+        return s
 
     def children(self)->Generator[Block,None,None]:
         try:
@@ -69,6 +73,7 @@ class _unsupported(Block):
 
 
 class _LabelledBlock(Block):
+    _DEFAULT_BLOCK = _unsupported
     _BLOCKS = {
         "Label": None,
     }
@@ -102,13 +107,17 @@ class _TextBlock(Block):
         self._text = list(_full_test(elem))
 
     def __str__(self) -> str:
-        return self._formated_text()
+        return self._formatted_text()
 
 
-    def _formated_text(self, max_column:int=_MAX_WIDTH)->str:
-        indent_str = "    " * self.level
-        lines = _word_wrap(self._text, max_column - len(indent_str))
-        return "\n".join(f"{indent_str}{line}" for line in lines)
+    def _formatted_text(self, max_column:int=_MAX_WIDTH)->str:
+        indent = self.indent
+        lines = _word_wrap(self._text, max_column - len(indent))
+        if VERBOSE:
+            lines = ["  " + l for l in lines ]
+            lines = [f"<{self.tag}>]"] + lines + [f"</{self.tag}>"]
+        return "\n".join(f"{indent}{line}" for line in lines)
+
 
 
 
@@ -159,18 +168,116 @@ class Text(_TextBlock):
     }
 
 
+class _ContinuedBlock(Block):
+    _DEFAULT_BLOCK = _unsupported
+    _BLOCKS = {
+          "Text": Text,
+     }
+
+class ContinuedClause(_ContinuedBlock): pass
+class ContinuedDefinition(_ContinuedBlock): pass
+class ContinuedParagraph(_ContinuedBlock): pass
+class ContinuedSubparagraph(_ContinuedBlock): pass
+class ContinuedSectionSubsection(_ContinuedBlock): pass
+class ContinuedFormulaParagraph(_ContinuedBlock): pass
+class ContinuedSubclause(_ContinuedBlock): pass
+
+class FormulaTerm(_TextBlock):
+    pass
+class FormulaText(_TextBlock):
+    pass
+class FormulaConnector(_TextBlock):
+    pass
+
+class FormulaParagraph(_LabelledBlock):
+    @staticmethod
+    def _provision(elem: ET.Element, level:int)->Provision:
+        return Provision(elem, level)
+
+    @staticmethod
+    def _formula_paragraph(elem: ET.Element, level:int)->Block:
+        return FormulaParagraph(elem, level)
+
+    @staticmethod
+    def _formula_group(elem: ET.Element, level:int)->Block:
+        return FormulaGroup(elem, level)
+
+    _BLOCKS = {
+        "ContinuedFormulaParagraph": ContinuedFormulaParagraph,
+        "FormulaGroup": _formula_group,
+        "FormulaParagraph": _formula_paragraph,
+        "Label": None,
+        "Provision": _provision,
+        "Text": Text,
+    }
+
+
+class FormulaDefinition(Block):
+    @staticmethod
+    def _formula_group(elem: ET.Element, level:int)->Block:
+        return FormulaGroup(elem, level)
+
+    _DEFAULT_BLOCK = _unsupported
+    _BLOCKS = {
+        "ContinuedFormulaParagraph": ContinuedFormulaParagraph,
+        "FormulaGroup": _formula_group,
+        "FormulaParagraph": FormulaParagraph,
+        "FormulaTerm": FormulaTerm,
+        "Text": Text,
+    }
+
+
+class Formula(Block):
+    _DEFAULT_BLOCK = _unsupported
+    _BLOCKS = {
+        "FormulaText": FormulaText,
+    }
+
+
+class FormulaGroup(Block):
+   _DEFAULT_BLOCK = _unsupported
+   _BLOCKS = {
+       "Formula":                Formula,
+       "FormulaConnector":       FormulaConnector,
+       "FormulaDefinition":      FormulaDefinition,
+   }
+
+
+
+
+
+
+class ReadAsText(Block):
+   _DEFAULT_BLOCK = _unsupported
+   @staticmethod
+   def _section(elem: ET.Element, level:int)->Section:
+       return Section(elem, level)
+
+   @staticmethod
+   def _section_piece(elem: ET.Element, level:int)->SectionPiece:
+         return SectionPiece(elem, level)
+
+   _BLOCKS = {
+        "FormulaDefinition": FormulaDefinition,
+        "FormulaParagraph": FormulaParagraph,
+        "Section": _section,
+        "SectionPiece": _section_piece,
+    }
+
 
 class HistoricalNote(_TextBlock):
     _BLOCKS = {
         "HistoricalNoteSubItem":None,
     }
 
+class Subsubclause(_LabelledBlock):
+   _BLOCKS = {
+        "Label": None,
+        "ReadAsText": ReadAsText,
+        "Text": Text,
+    }
 
-
-
-
-
-class MarginalNote(Block):
+class MarginalNote(_TextBlock):
     _TEXT = True
     _BLOCKS = {
         "DefinedTermFr":None,
@@ -182,27 +289,46 @@ class MarginalNote(Block):
     _DEFAULT_BLOCK = _unsupported
 
 
+class Subclause(_LabelledBlock):
+   _BLOCKS = {
+    "ContinuedSubclause": ContinuedSubclause,
+    "FormulaGroup": FormulaGroup,
+    "Label": None,
+    "ReadAsText": ReadAsText,
+    "Subsubclause": Subsubclause,
+    "Text": Text,
+   }
 
+
+class Clause(_LabelledBlock):
+    _BLOCKS = {
+        "ContinuedClause": ContinuedClause,
+        "FormulaGroup": FormulaGroup,
+        "Label": None,
+        "ReadAsText": ReadAsText,
+        "Subclause": Subclause,
+        "Text": Text,
+    }
 
 class Subparagraph(_LabelledBlock):
    _BLOCKS = {
-        "Clause":                   Block,
-        "ContinuedSubparagraph":    Block,
-        "FormulaGroup":             Block,
+        "Clause":                   Clause,
+        "ContinuedSubparagraph":    ContinuedSubparagraph,
+        "FormulaGroup":             FormulaGroup,
         "Label":                    None,
-        "ReadAsText":               Block,
+        "ReadAsText":               ReadAsText,
         "Text":                     Text,
    }
 
 
 class Paragraph(_LabelledBlock):
    _BLOCKS = {
-        "ContinuedParagraph" : Block,
-        "FormulaDefinition" : Block,
-        "FormulaGroup" : Block,
+        "ContinuedParagraph" : ContinuedParagraph,
+        "FormulaDefinition" : FormulaDefinition,
+        "FormulaGroup" : FormulaGroup,
         "Label" : None,
         "MarginalNote" : MarginalNote,
-        "ReadAsText" : Block,
+        "ReadAsText" : ReadAsText,
         "Subparagraph" : Subparagraph,
         "Text" : Text,
    }
@@ -213,17 +339,44 @@ class Paragraph(_LabelledBlock):
 
 
 
+
+class Provision(_LabelledBlock):
+
+   @staticmethod
+   def _provision(elem: ET.Element, level:int)->Block:
+       return Provision(elem, level)
+
+   _BLOCKS = {
+        "Label": None,
+        "Provision": _provision,
+        "Text": Text,
+   }
+
+
+class Definition(Block):
+   _DEFAULT_BLOCK = _unsupported
+   _BLOCKS = {
+        "ContinuedDefinition": ContinuedDefinition,
+        "FormulaDefinition": FormulaDefinition,
+        "FormulaGroup": FormulaGroup,
+        "Paragraph": Paragraph,
+        "Provision": Provision,
+        "Text": Text,
+   }
+
+
+
 class Subsection(_LabelledBlock):
     _BLOCKS = {
-        "ContinuedSectionSubsection": Block,
-        "Definition":                 Block,
-        "FormulaDefinition":          Block,
-        "FormulaGroup":               Block,
+        "ContinuedSectionSubsection": ContinuedSectionSubsection,
+        "Definition":                 Definition,
+        "FormulaDefinition":          FormulaDefinition,
+        "FormulaGroup":               FormulaGroup,
         "Label":                      None,
         "MarginalNote":               MarginalNote,
         "Paragraph":                  Paragraph,
-        "Provision":                  Block,
-        "ReadAsText":                 Block,
+        "Provision":                  Provision,
+        "ReadAsText":                 ReadAsText,
         "Text":                       Text,
     }
     _DEFAULT_BLOCK = _unsupported
@@ -234,18 +387,33 @@ class Section(_LabelledBlock):
 
     _BLOCKS = {
         "AmendedText":                  Block,
-        "ContinuedSectionSubsection":   Block,
-        "Definition":                   Block,
-        "FormulaGroup":                 Block,
+        "ContinuedSectionSubsection":   ContinuedSectionSubsection,
+        "Definition":                   Definition,
+        "FormulaGroup":                 FormulaGroup,
         "HistoricalNote":               HistoricalNote,
         "Label":                        None,
         "MarginalNote":                 MarginalNote,
         "Paragraph":                    Paragraph,
-        "ReadAsText":                   Block,
+        "ReadAsText":                   ReadAsText,
         "Subsection":                   Subsection,
         "Text":                         Text,
     }
     _DEFAULT_BLOCK = _unsupported
+
+
+
+class SectionPiece(Block):
+   _DEFAULT_BLOCK = _unsupported
+   _BLOCKS = {
+        "Clause":               Clause,
+        "Definition":           Definition,
+        "FormulaDefinition":    FormulaDefinition,
+        "FormulaGroup":         FormulaGroup,
+        "FormulaParagraph":     FormulaParagraph,
+        "Paragraph":            Paragraph,
+        "Provision":            Provision,
+        "Subparagraph":         Subparagraph,
+    }
 
 
 class Body(Block):
