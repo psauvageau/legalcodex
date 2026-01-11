@@ -46,11 +46,12 @@ class Block(ABC):
         return "  " * self.level
 
     def __str__(self) -> str:
-        s =  f"{self.indent}<{self.tag}>"
+
         if VERBOSE:
             if type(self) == Block:
                 _logger.warning(f"TODO:  {self.tag}")
-        return s
+        #return f"{self.indent}<{self.tag}>"
+        return ""
 
     def children(self)->Generator[Block,None,None]:
         try:
@@ -498,17 +499,14 @@ class Statute(Block):
 
 def walk(block:Block,
          f:Callable[[Block], None])->None:
+    """
+    Apply function f to block and all its children recursively.
+    """
     f(block)
     for child in block.children():
         walk(child, f)
 
-class UnsupportedBlockError(Exception):
-    parent_element : Optional[ET.Element] = None
 
-    @property
-    def parent_content(self)->str:
-        assert self.parent_element is not None
-        return ET.tostring(self.parent_element, encoding="unicode")
 
 def _get_text(elem: ET.Element)->str:
     """
@@ -596,12 +594,23 @@ def _init_logger(verbose:bool)->None:
     for handler in logging.root.handlers:
         handler.setFormatter(InfoFormatter(full_format))
 
+
+class UnsupportedBlockError(Exception):
+    parent_element : Optional[ET.Element] = None
+
+    @property
+    def parent_content(self)->str:
+        assert self.parent_element is not None
+        return ET.tostring(self.parent_element, encoding="unicode")
+
 def main()->None:
     _init_logger(VERBOSE)
 
     def print_block(block:Block)->None:
         try:
-            print(block)
+            s:str = str(block)
+            if s:
+                print(s)
         except UnicodeEncodeError as err    :
             _logger.error(f"Error in  {block.tag} at level {block.level}")
             _logger.error(str(err))
