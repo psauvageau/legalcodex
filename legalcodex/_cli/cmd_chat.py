@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import logging
-
 import argparse
 
-from .engine_cmd import EngineCommand
-from ..chat_behaviour import ChatBehaviour
+from ..chat.chat_behaviour import ChatBehaviour
 from ..exceptions import LCException
+
+from .engine_cmd import EngineCommand
 
 
 _logger = logging.getLogger(__name__)
 
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
-DEFAULT_MAX_TURN = 99
+DEFAULT_MAX_TURN = 40
 
 class CommandChat(EngineCommand):
     title: str = "chat"
