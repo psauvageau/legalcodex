@@ -37,8 +37,8 @@ class MockEngine(Engine):
         latest_user_prompt = ""
 
         for message in reversed(messages):
-            if message["role"] == "user":
-                latest_user_prompt = message["content"]
+            if message.role == "user":
+                latest_user_prompt = message.content
                 break
 
         return self.run(latest_user_prompt)

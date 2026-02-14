@@ -14,8 +14,8 @@ class TestChatBehaviour(unittest.TestCase):
         behaviour = ChatBehaviour(self.engine, system_prompt="System prompt")
 
         self.assertEqual(len(behaviour.history), 1)
-        self.assertEqual(behaviour.history[0]["role"], "system")
-        self.assertEqual(behaviour.history[0]["content"], "System prompt")
+        self.assertEqual(behaviour.history[0].role, "system")
+        self.assertEqual(behaviour.history[0].content, "System prompt")
 
     def test_receive_user_message_appends_turn_and_returns_response(self) -> None:
         behaviour = ChatBehaviour(self.engine, system_prompt="System prompt")
@@ -24,9 +24,9 @@ class TestChatBehaviour(unittest.TestCase):
 
         self.assertIn("MockEngine response #0", response)
         self.assertEqual(len(behaviour.history), 3)
-        self.assertEqual(behaviour.history[1]["role"], "user")
-        self.assertEqual(behaviour.history[1]["content"], "Hello")
-        self.assertEqual(behaviour.history[2]["role"], "assistant")
+        self.assertEqual(behaviour.history[1].role, "user")
+        self.assertEqual(behaviour.history[1].content, "Hello")
+        self.assertEqual(behaviour.history[2].role, "assistant")
 
     def test_reset_keeps_only_system_message(self) -> None:
         behaviour = ChatBehaviour(self.engine, system_prompt="System prompt")
@@ -35,7 +35,7 @@ class TestChatBehaviour(unittest.TestCase):
         behaviour.reset()
 
         self.assertEqual(len(behaviour.history), 1)
-        self.assertEqual(behaviour.history[0]["role"], "system")
+        self.assertEqual(behaviour.history[0].role, "system")
 
     def test_rejects_empty_user_message(self) -> None:
         behaviour = ChatBehaviour(self.engine, system_prompt="System prompt")
@@ -50,8 +50,8 @@ class TestChatBehaviour(unittest.TestCase):
         behaviour.receive_user_message("second")
 
         self.assertEqual(len(behaviour.history), 3)
-        self.assertEqual(behaviour.history[0]["role"], "system")
-        self.assertEqual(behaviour.history[1]["content"], "second")
+        self.assertEqual(behaviour.history[0].role, "system")
+        self.assertEqual(behaviour.history[1].content, "second")
 
 
 if __name__ == "__main__":

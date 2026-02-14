@@ -4,7 +4,8 @@ Represent an abstract AI Engine API
 from __future__ import annotations
 
 import logging
-from typing import Final, Literal, TypedDict
+from dataclasses import dataclass
+from typing import Final, Literal
 from abc import ABC, abstractmethod
 
 from ._config import Config
@@ -15,7 +16,8 @@ _logger = logging.getLogger(__name__)
 Role = Literal["system", "user", "assistant", "tool"]
 
 
-class Message(TypedDict):
+@dataclass(frozen=True)
+class Message:
     role: Role
     content: str
 

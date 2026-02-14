@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 from typing import Optional, Final
 
@@ -16,10 +15,10 @@ class _ChatContext(Context):
 
     def __init__(self, system_prompt: str) -> None:
 
-        self._system_prompt = {
-            "role": "system",
-            "content": system_prompt.strip(),
-        }
+        self._system_prompt = Message(
+            role="system",
+            content=system_prompt.strip(),
+        )
 
         self._history = []
 
@@ -85,9 +84,9 @@ class ChatBehaviour:
         if not prompt:
             raise ValueError("user_message must not be empty")
 
-        self._context.append({"role": "user", "content": prompt})
+        self._context.append(Message(role="user", content=prompt))
         response = self._engine.run_messages(self._context)
-        self._context.append({"role": "assistant", "content": response})
+        self._context.append(Message(role="assistant", content=response))
 
         self._context.trim(self._max_turns)
 
