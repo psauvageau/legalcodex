@@ -4,12 +4,33 @@ Represent an abstract AI Engine API
 from __future__ import annotations
 
 import logging
-from typing import Optional, Final, Type
+from typing import Final, Literal, TypedDict
 from abc import ABC, abstractmethod
 
 from ._config import Config
 
 _logger = logging.getLogger(__name__)
+
+
+Role = Literal["system", "user", "assistant", "tool"]
+
+
+class Message(TypedDict):
+    role: Role
+    content: str
+
+
+class Context(ABC):
+    """
+    Abstract conversation context passed to engine implementations.
+    """
+
+    @abstractmethod
+    def get_messages(self)->list[Message]:
+        """
+        Return provider-agnostic chat messages for the current context.
+        """
+        pass
 
 
 class Engine(ABC):
@@ -44,5 +65,12 @@ class Engine(ABC):
     def run(self, prompt:str)->str:
         """
         Run the engine with the given prompt and return the response.
+        """
+        pass
+
+    @abstractmethod
+    def run_messages(self, context:Context)->str:
+        """
+        Run the engine with a full conversational context and return the response.
         """
         pass

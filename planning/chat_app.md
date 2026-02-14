@@ -31,7 +31,7 @@ Arguments:
 - `--system`: optional system-prompt override for this session.
 - `--max-turns`: optional cap for retained conversational turns (user+assistant pairs), minimum value `1`.
 
-Behavioral rules:
+Behavioural rules:
 - Prompt prefix: `You>`
 - Output prefix: `AI >`
 - Empty input (after `.strip()`): do not call engine; print short hint.

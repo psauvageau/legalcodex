@@ -10,6 +10,8 @@ from openai import OpenAI, RateLimitError
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionSystemMessageParam
 
+from legalcodex.engine import Context
+
 from .._config import Config
 from ..engine import Engine
 from ..exceptions import LCException, QuotaExceeded
@@ -40,6 +42,12 @@ class OpenAIEngine(Engine):
             api_key:str = self.config.api_keys[self.NAME]
             self._client = OpenAI(api_key=api_key)
         return self._client
+
+
+    def run_messages(self, context: Context) -> str:
+        #TODO: implement message handling and conversion to OpenAI format
+        _logger.warning("Unimplemented.")
+        return "unimplemented"
 
 
     def run(self, prompt:str)->str:

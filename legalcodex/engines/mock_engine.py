@@ -4,7 +4,7 @@ import logging
 
 
 
-from ..engine import Engine
+from ..engine import Context, Engine
 
 
 _logger = logging.getLogger(__name__)
@@ -28,5 +28,19 @@ class MockEngine(Engine):
         message = f"MockEngine response #{self._count} to prompt: {prompt}"
         self._count += 1
         return message
+
+    def run_messages(self, context:Context)->str:
+        """
+        Return a deterministic response based on the latest user message in context.
+        """
+        messages = context.get_messages()
+        latest_user_prompt = ""
+
+        for message in reversed(messages):
+            if message["role"] == "user":
+                latest_user_prompt = message["content"]
+                break
+
+        return self.run(latest_user_prompt)
 
 
