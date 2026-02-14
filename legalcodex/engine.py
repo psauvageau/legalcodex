@@ -63,12 +63,7 @@ class Engine(ABC):
         assert hasattr(self, "NAME"), "Engine subclass must have a NAME class attribute"
         return self.NAME # type: ignore
 
-    @abstractmethod
-    def run(self, prompt:str)->str:
-        """
-        Run the engine with the given prompt and return the response.
-        """
-        pass
+
 
     @abstractmethod
     def run_messages(self, context:Context)->str:
