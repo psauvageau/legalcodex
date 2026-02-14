@@ -8,6 +8,7 @@ from ._types import JSON_DICT
 from ._misc import CONFIG_PATH
 
 DEFAULT_FILE = CONFIG_PATH
+
 DEFAULT_MODEL = "gpt-4.1-mini"
 
 
@@ -26,7 +27,7 @@ class Config:
     )
 
     @classmethod
-    def load(cls, file_name :Optional[str] = None)->Config:
+    def load(cls, file_name :Optional[str])->Config:
         """
         Load configuration from a JSON file.
 

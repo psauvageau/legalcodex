@@ -17,5 +17,8 @@
             "approve": true,
             "matchCommandLine": true
         }
-    }
+    },
+    "cSpell.words": [
+        "genai"
+    ]
 }

@@ -4,23 +4,21 @@ import os
 import argparse
 import logging
 
-from .cli_cmd import CliCmd
+from .engine_cmd import EngineCommand
 
 from .._config import Config
 from ..engine import Engine
-from ..engines.openai_engine import OpenAIEngine
+from .._engine_selector import ENGINES, DEFAULT_ENGINE
 
 _logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o",  # or "gpt-4", "gpt-3.5-turbo"
-
-class CommandTest(CliCmd):
+class CommandTest(EngineCommand):
     title:str = "test"
 
     def run(self, args:argparse.Namespace)->None:
-        config = Config.load(args.config)
-        engine  :Engine = OpenAIEngine(config)
-        response = engine.run(args.prompt)
+        super().run(args)
+
+        response = self.engine.run(args.prompt)
         print("Response:")
         print(response)
 
@@ -30,6 +28,5 @@ class CommandTest(CliCmd):
         Add command specific arguments to the parser
         Override this method to add command specific arguments
         """
-        parser.add_argument('--path', '-p',action="store", type=str, default=None, help='Path to the directory')
+        super().add_arguments(parser)
         parser.add_argument('prompt', type=str, help='Prompt to send to the model')
-

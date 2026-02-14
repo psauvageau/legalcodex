@@ -47,6 +47,15 @@
 - The `test` command requires a positional `prompt`; it loads config and prints the first completion.
 - Avoid logging secrets; `Config.load` expects keys under `api_keys.openai` in `config.json`.
 
+### Logging
+- all files should have a module-level logger (`_logger = logging.getLogger(__name__)`) and use it for all logging.
+- all message to the console should be sent to the file's "_logger". print() should not be generally used.
+- the DEBUG level should be informative for developers but not overwhelming;
+- The INFO level should be relevant to the end-user
+
+### Error handling
+Generally, standard exceptions and third-party exceptions (e.g. from OpenAI) should not be allowed to reach the end-user. Instead, they should be caught and re-raised as `LegalCodexError` with a user-friendly message. The original exception should be logged at the DEBUG level for troubleshooting.
+
 ## Integration points
 - External API: openai Chat Completions via `OpenAI().chat.completions.create(model, messages=...)`.
 - Swap engine: create a new subclass of `Engine` with a `run(prompt)->str` and use it in commands instead of `OpenAIEngine`.

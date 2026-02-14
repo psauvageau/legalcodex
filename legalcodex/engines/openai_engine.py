@@ -50,7 +50,7 @@ class OpenAIEngine(Engine):
             messages = self.build_messages(prompt)
 
             response = self.client.chat.completions.create(
-                model=self._config.model,
+                model=self.config.model,
                 messages=messages
             )
 

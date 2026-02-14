@@ -49,6 +49,7 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
     parser.add_argument('--verbose', '-v',action="store_true", help='Enable verbose output')
     parser.add_argument('--test',    '-t',action="store_true", help='Set Test Mode')
 
+
     subparsers :argparse.Action = parser.add_subparsers()
     parser.set_defaults(command=None)
 
