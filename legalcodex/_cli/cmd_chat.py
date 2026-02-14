@@ -88,9 +88,15 @@ class ChatCommands:
             cmds = ", ".join(self._commands.keys())
             _logger.info("Commands: %s", cmds)
 
+        def history()->None:
+            messages = self._chat._context.get_messages()
+            for msg in messages:
+                _logger.info("%s: %s", msg.role, msg.content)
+
         self._commands = {      "exit": exit,
                                 "quit": exit,
                                 "help": help,
+                                "history": history,
                                 "reset": self._chat.reset,
                 }
 
