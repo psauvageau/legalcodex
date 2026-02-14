@@ -2,11 +2,17 @@ import argparse
 import logging
 from typing import List, Type, Iterable, Optional, Generator
 
+from .exceptions import LCException
+
 from ._cli.cli_cmd import CliCmd
-from ._cli import cmd_test
+from ._cli.cmd_chat import CommandChat
+from ._cli.cmd_test import CommandTest
+
 
 COMMANDS :List[Type[CliCmd]] = [
-    cmd_test.CommandTest,
+    CommandChat,
+    CommandTest,
+    # Add new command classes here
 ]
 
 
@@ -14,19 +20,23 @@ def main()->None:
     """
     Main entry point for the LegalCodex CLI tool.
     """
-    args: argparse.Namespace = _create_parser(COMMANDS).parse_args()
+    args: argparse.Namespace = _get_args(COMMANDS)
 
     init_log(args.verbose)
 
     if args.command:        # Execute the command
-        args.command.run(args)
+        try:
+            args.command.run(args)
+        except LCException as e:
+            logging.error("Error: %s", e)
+            exit(1)
     else:
         print(f"No command specified. [{", ".join([cmd.title for cmd in COMMANDS])}]")
         exit(1)
 
 
 
-def _create_parser(cmds:List[Type[CliCmd]]) -> argparse.ArgumentParser:
+def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
     """
     Create the main argument parser for the CLI
     """
@@ -46,7 +56,7 @@ def _create_parser(cmds:List[Type[CliCmd]]) -> argparse.ArgumentParser:
     for cmd in cmds:
         cmd().register(subparsers)
 
-    return parser
+    return parser.parse_args()
 
 
 

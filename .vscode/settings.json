@@ -6,5 +6,16 @@
         "**/*.egg-info": true,
         ".venv/": true
     },
-    "files.trimTrailingWhitespace": true
+    "files.trimTrailingWhitespace": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^python \\.github/copilot_skills/run_tests_skill\\.py --cwd \\. --pytest-args \"-q\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "pytest": true,
+        "/^python -m legalcodex --help$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

@@ -7,7 +7,8 @@ import logging
 from .cli_cmd import CliCmd
 
 from .._config import Config
-from ..engine import Engine, OpenAIEngine
+from ..engine import Engine
+from ..engines.openai_engine import OpenAIEngine
 
 _logger = logging.getLogger(__name__)
 
