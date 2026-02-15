@@ -1,12 +1,16 @@
 import argparse
 import logging
 from typing import List, Type, Iterable, Optional, Generator
+from contextlib import contextmanager
+from contextlib import contextmanager
 
 from .exceptions import LCException
 
 from ._cli.cli_cmd import CliCmd
 from ._cli.cmd_chat import CommandChat
 from ._cli.cmd_test import CommandTest
+
+from ._cli._log_window import log_window
 
 
 COMMANDS :List[Type[CliCmd]] = [
@@ -26,13 +30,30 @@ def main()->None:
 
     if args.command:        # Execute the command
         try:
-            args.command.run(args)
+            with _log_context(args.log_window):
+                args.command.run(args)
         except LCException as e:
             logging.error("Error: %s", e)
             exit(1)
     else:
         print(f"No command specified. [{", ".join([cmd.title for cmd in COMMANDS])}]")
         exit(1)
+
+
+@contextmanager
+def _log_context(enable_log_window: bool) -> Generator[None, str, None]:
+    """
+    Context manager for the log window. If log_window is True, it will create a log window and attach a logging handler to it.
+    The log window will display log messages emitted while the context is active.
+    """
+    if enable_log_window:
+        with log_window():
+            yield
+        input("Press Enter to exit...")
+    else:
+        yield
+
+
 
 
 
@@ -48,6 +69,7 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
     parser.add_argument('--config', '-c',action="store", type=str, default=None, help='Path to the config file')
     parser.add_argument('--verbose', '-v',action="store_true", help='Enable verbose output')
     parser.add_argument('--test',    '-t',action="store_true", help='Set Test Mode')
+    parser.add_argument('--log-window',    '-l',action="store_true", help='Open the log window')
 
 
     subparsers :argparse.Action = parser.add_subparsers()
