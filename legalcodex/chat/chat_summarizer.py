@@ -21,7 +21,7 @@ def summarize_overflow( engine:Engine,
                         overflow: list[Message]) -> str:
     """
     Summarize the overflow messages into a single Message that can be prepended to the context.
-    If summarization fails, returns None to indicate that the overflow should be kept as-is.
+    If summarization fails, returns an empty string to indicate that the overflow should be kept as-is.
     """
     _logger.debug("Summarizing overflow of %d messages", len(overflow))
     _logger.debug("Existing summary: %s", bool(existing_summary))

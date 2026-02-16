@@ -29,12 +29,15 @@ class ChatContext(BaseContext):
                  system_prompt: str,
                  max_messages: int,
                  trim_length:Optional[int]=None) -> None:
+
+        if max_messages <= 4:
+            raise ValueError("max_messages must be greater than 4 to allow for trimming")
+
         self._summary = ""
         self._engine = engine
         self._system_prompt = Message("system", system_prompt.strip())
         self._max_messages = max_messages
-        self._to_remove = trim_length if trim_length is not None else int(max_messages/2)
-
+        self._to_remove = max(trim_length if trim_length is not None else int(max_messages/2), 1)
         self._history = []
 
 
@@ -86,7 +89,11 @@ class ChatContext(BaseContext):
             _logger.info("New length=%d, max=%d", len(self._history))
 
         except Exception as err:
-            _logger.exception("Failed to summarize overflow; keeping full history")
+            _logger.error("Failed to summarize overflow; keeping full history")
+            _logger.exception(err)
+            _logger.warning("Trimming History without summarization. This may lead to loss of important context.")
+            self._history = self._history[self._to_remove:]
+
 
 
     def __len__(self) -> int:
