@@ -2,14 +2,9 @@ import logging
 from typing import Optional, Final
 from dataclasses import dataclass
 
-
-
-from ..engine import Engine, Message, Context
-
-
-
-
-
+from ..engine import Engine
+from ..context import Context, SimpleContext
+from ..message import Message
 
 _logger = logging.getLogger(__name__)
 
@@ -28,6 +23,9 @@ def summarize_overflow( engine:Engine,
     Summarize the overflow messages into a single Message that can be prepended to the context.
     If summarization fails, returns None to indicate that the overflow should be kept as-is.
     """
+    _logger.debug("Summarizing overflow of %d messages", len(overflow))
+    _logger.debug("Existing summary: %s", bool(existing_summary))
+
     messages = [ Message("system",SUMMARIZE_PROMPT)]
 
     if existing_summary:
@@ -39,11 +37,10 @@ def summarize_overflow( engine:Engine,
                 "Merge and compress the following older conversation turns into a short summary:\n"\
                 f"{summary_input.content}")
     )
-    summary_text :str = engine.run_messages(_SummaryContext(messages)).strip()
+    summary_text :str = engine.run_messages(messages).strip()
 
     if not summary_text:
         _logger.warning("Received empty overflow summary")
-
 
     return summary_text
 
@@ -65,11 +62,5 @@ def collate_messages(overflow: list[Message]) -> Message:
 
 
 
-@dataclass(frozen=True)
-class _SummaryContext(Context):
-    _messages: list[Message]
-
-    def get_messages(self) -> list[Message]:
-        return list(self._messages)
 
 

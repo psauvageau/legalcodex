@@ -12,7 +12,9 @@ from openai import OpenAI, RateLimitError
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat import ChatCompletionMessageParam
 
-from ..engine import Context, Engine, Message
+from ..engine import Engine
+from ..context import Context
+from ..message import Message
 from ..exceptions import LCException, QuotaExceeded
 
 
@@ -45,10 +47,9 @@ class OpenAIEngine(Engine):
 
     def run_messages(self, context: Context) -> str:
         try:
-            source_messages = context.get_messages()
             messages: list[ChatCompletionMessageParam] = [
-                _message(message.role, message.content) for message in source_messages
-            ]
+                _message(message) for message in context
+                ]
 
             response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -77,8 +78,9 @@ class OpenAIEngine(Engine):
 
 
 
-def _message(role:str, content:str)->ChatCompletionMessageParam:
+def _message(message:Message)->ChatCompletionMessageParam:
     """
     Create a message dictionary for the chat completion.
     """
-    return {"role": role, "content": content} #type: ignore
+    return {"role":     message.role,
+            "content":  message.content} #type: ignore

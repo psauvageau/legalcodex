@@ -20,7 +20,7 @@ class CommandTest(EngineCommand):
     def run(self, args:argparse.Namespace)->None:
         super().run(args)
 
-        context = ContextTest(args.prompt)
+        context = _get_context(args.prompt)
         response = self.engine.run_messages(context)
         print("Response:")
         print(response)
@@ -36,18 +36,10 @@ class CommandTest(EngineCommand):
 
 
 
-class ContextTest(Context):
 
+def _get_context(prompt:str)->Context:
 
-    def __init__(self, prompt: str):
-        self._messages = [
+    return [
             Message(role="system", content=_SYSTEM_PROMPT),
             Message(role="user", content=prompt),
         ]
-
-
-
-
-
-    def get_messages(self)->list[Message]:
-        return self._messages

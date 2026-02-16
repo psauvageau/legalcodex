@@ -7,6 +7,7 @@ from typing import Final, Iterable, Generator
 from contextlib import contextmanager, closing
 import logging
 import multiprocessing
+from multiprocessing import synchronize
 from queue import Empty
 import tkinter as tk
 from tkinter import ttk
@@ -121,7 +122,7 @@ class _Window(tk.Tk):
 
 
 def _run_ui(message_queue: multiprocessing.Queue[str],
-            closed: multiprocessing.Event) -> None:
+            closed: synchronize.Event) -> None:
 
     """
     The target function for the log window process.

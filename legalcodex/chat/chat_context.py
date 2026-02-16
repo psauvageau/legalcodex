@@ -3,18 +3,17 @@ Conversation Context.
 """
 import logging
 
-from typing import Final, Optional
-from ..engine import Context, Message, Engine
+from typing import Final, Optional, Iterable
+from ..engine import Engine
+from ..message import Message
+from ..context import BaseContext
 
 from .chat_summarizer import summarize_overflow
-
 
 _logger = logging.getLogger(__name__)
 
 
-
-
-class ChatContext(Context):
+class ChatContext(BaseContext):
     """
     ChatContext manages the conversation history and system prompt for a chat session.
     It provides methods to get the full message history, append new messages, and trim the history to
@@ -39,7 +38,7 @@ class ChatContext(Context):
         self._history = []
 
 
-    def get_messages(self) -> list[Message]:
+    def get_messages(self) -> Iterable[Message]:
         """
         Return the full message history including the system prompt.
         """
@@ -55,6 +54,7 @@ class ChatContext(Context):
         """
         Append a message to the history.
         """
+        _logger.debug("Appending message to history: %s", message)
         self._history.append(message)
 
         if len(self._history) > self._max_messages:
@@ -64,6 +64,7 @@ class ChatContext(Context):
         """
         Trim the message history to the specified maximum number of turns.
         """
+        _logger.info("Trimming chat history. Current length=%d, max=%d", len(self._history), self._max_messages)
         try:
             #split the history into the part to keep and the overflow
             overflow = self._history[:self._to_remove]
@@ -74,12 +75,19 @@ class ChatContext(Context):
 
             new_summary = summarize_overflow(self._engine, self._summary, overflow)
 
+            _logger.debug("History trimmed. Kept %d messages, summarized %d messages into %d chars",
+                          len(keep), len(overflow), len(new_summary) if new_summary else 0)
+
+            _logger.debug("New summary content: %s", new_summary)
+
             self._history = keep
             self._summary = new_summary if new_summary else self._summary
 
+            _logger.info("New length=%d, max=%d", len(self._history))
+
         except Exception as err:
             _logger.exception("Failed to summarize overflow; keeping full history")
-            return
+
 
     def __len__(self) -> int:
         """

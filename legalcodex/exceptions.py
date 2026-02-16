@@ -1,8 +1,25 @@
+from typing import Optional
 
 
 class LCException(Exception):
     """Base exception for LegalCodex."""
     pass
+
+
+class ValueError(LCException):
+    """
+    Exception raised for errors in the input value.
+    """
+    pass
+
+    @classmethod
+    def validate_type(cls,  value:object,
+                            expected_type:type,
+                            message:Optional[str]=None) -> None:
+        if message is None:
+            message = f"Expected value of type {expected_type.__name__}, got {type(value).__name__}"
+        if not isinstance(value, expected_type):
+            raise cls(message)
 
 
 

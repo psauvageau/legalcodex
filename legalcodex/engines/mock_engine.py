@@ -1,10 +1,8 @@
 from typing import Final
 import logging
 
-
-
-
-from ..engine import Context, Engine
+from ..engine import Engine
+from ..context import Context
 
 
 _logger = logging.getLogger(__name__)
@@ -19,7 +17,6 @@ class MockEngine(Engine):
 
     _count:int = 0
 
-
     def run(self, prompt:str)->str:
         """
         Return a fixed response for testing.
@@ -33,7 +30,7 @@ class MockEngine(Engine):
         """
         Return a deterministic response based on the latest user message in context.
         """
-        messages = context.get_messages()
+        messages = list(context)
         latest_user_prompt = ""
 
         for message in reversed(messages):
@@ -42,5 +39,3 @@ class MockEngine(Engine):
                 break
 
         return self.run(latest_user_prompt)
-
-

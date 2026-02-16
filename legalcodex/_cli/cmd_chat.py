@@ -59,7 +59,7 @@ class CommandChat(EngineCommand):
 
                 commands.execute(prompt)
 
-                response = chat.receive_user_message(prompt)
+                response = chat.send_message(prompt)
                 _logger.info("AI > %s", response)
 
             except CommandExecutedException:

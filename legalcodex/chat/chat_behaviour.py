@@ -47,7 +47,11 @@ class ChatBehaviour:
                                     max_messages = self._max_turns)
 
 
-    def receive_user_message(self, user_message: str) -> str:
+    def send_message(self, user_message: str) -> str:
+        """
+        Send a user message to the engine and get the assistant's response.
+         - The user message is appended to the context history.
+        """
         prompt = user_message.strip()
         if not prompt:
             raise ValueError("user_message must not be empty")
@@ -60,7 +64,9 @@ class ChatBehaviour:
 
         return response
 
+
+    #Used only for testing to inspect the message history
     @property
     def history(self) -> list[Message]:
-        return self._context.get_messages()
+        return list(self._context.get_messages())
 

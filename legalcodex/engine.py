@@ -5,34 +5,28 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final, Literal, Iterable, get_args, cast
 from abc import ABC, abstractmethod
 
+
+from ._types import JSON_DICT
 from ._config import Config
+from .exceptions import ValueError
+from .message import Message
+from .context import Context
 
 _logger = logging.getLogger(__name__)
 
 
-Role = Literal["system", "user", "assistant", "tool"]
 
 
-@dataclass(frozen=True)
-class Message:
-    role: Role
-    content: str
 
 
-class Context(ABC):
-    """
-    Abstract conversation context passed to engine implementations.
-    """
 
-    @abstractmethod
-    def get_messages(self)->list[Message]:
-        """
-        Return provider-agnostic chat messages for the current context.
-        """
-        pass
+
+
+
+
 
 
 class Engine(ABC):
