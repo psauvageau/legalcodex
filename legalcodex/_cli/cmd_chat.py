@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 import argparse
+import os
 
 from ..chat.chat_behaviour import ChatBehaviour
+from ..chat.chat_context import ChatContext
 from ..exceptions import LCException
 
 from .engine_cmd import EngineCommand
@@ -14,6 +16,9 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 DEFAULT_MAX_TURN = 40
+
+
+FILE_NAME = "chat_context.json"
 
 class CommandChat(EngineCommand):
     title: str = "chat"
@@ -37,16 +42,30 @@ class CommandChat(EngineCommand):
             help="Maximum number of user/assistant turns to keep in memory",
         )
 
+        parser.add_argument("--no-load", action="store_true", help="Do not load chat history from a file")
+
+    def _get_chat_context(self, args: argparse.Namespace) -> ChatContext:
+
+        load = not args.no_load
+
+        if load:
+            if os.path.exists(FILE_NAME):
+                return ChatContext.load(FILE_NAME)
+            else:
+                _logger.warning("No existing chat context found, starting new session.")
+
+        chat = ChatContext( system_prompt=args.system,
+                            max_messages=args.max_turns)
+        return chat
 
 
     def run(self, args: argparse.Namespace) -> None:
         super().run(args)
 
-        chat = ChatBehaviour(
-            engine=self.engine,
-            system_prompt=args.system,
-            max_turns=args.max_turns,
-        )
+        chat_context = self._get_chat_context(args)
+
+        chat = ChatBehaviour(self.engine, chat_context)
+
         commands = ChatCommands(chat)
 
         _logger.info("Starting interactive chat session. Type 'help' for commands.")
@@ -70,7 +89,9 @@ class CommandChat(EngineCommand):
 
             except (KeyboardInterrupt, ExitException):
                     _logger.info("\nExiting chat session.")
+                    chat.context.save(FILE_NAME)
                     break
+
 
 
 
@@ -89,7 +110,7 @@ class ChatCommands:
             _logger.info("Commands: %s", cmds)
 
         def history()->None:
-            messages = self._chat._context.get_messages()
+            messages = self._chat.context.get_messages()
             for msg in messages:
                 _logger.info("%s: %s", msg.role, msg.content)
 
@@ -97,7 +118,7 @@ class ChatCommands:
                                 "quit": exit,
                                 "help": help,
                                 "history": history,
-                                "reset": self._chat.reset,
+                                "reset": self._chat.context.reset,
                 }
 
     def execute(self, prompt:str)->None:

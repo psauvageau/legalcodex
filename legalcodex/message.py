@@ -37,3 +37,7 @@ class Message:
         return cls(role=cast(Role, role),
             content=cast(str, content))
 
+
+    @classmethod
+    def User(cls, content:str)->Message:
+        return Message("user", content)

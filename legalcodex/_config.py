@@ -42,3 +42,11 @@ class Config:
             data = json.load(f)
 
         return cls(**data)
+
+
+class MockConfig(Config):
+    """
+    A mock configuration for testing purposes.
+    """
+    def __init__(self) -> None:
+        super().__init__(api_keys={"mock": "mock_api_key"}, model="mock_model")

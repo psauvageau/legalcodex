@@ -1,13 +1,12 @@
+from __future__ import annotations
 from typing import Final
 import logging
 
 from ..engine import Engine
 from ..context import Context
-
+from .._config import Config, MockConfig
 
 _logger = logging.getLogger(__name__)
-
-
 
 class MockEngine(Engine):
     """
@@ -15,27 +14,25 @@ class MockEngine(Engine):
     """
     NAME : Final[str]  = "mock"
 
-    _count:int = 0
+    def __init__(self, config:Config=None)->None: #type: ignore
+        self._count:int = 0
+        if config is None:
+            config = MockConfig()
+        super().__init__(config=MockConfig()) # type: ignore
 
-    def run(self, prompt:str)->str:
-        """
-        Return a fixed response for testing.
-        """
-        _logger.debug("MockEngine received prompt: %s", prompt)
-        message = f"MockEngine response #{self._count} to prompt: {prompt}"
-        self._count += 1
-        return message
+    @property
+    def count(self)->int:
+        return self._count
+
 
     def run_messages(self, context:Context)->str:
         """
-        Return a deterministic response based on the latest user message in context.
+        Return a deterministic response based
+        on the latest user message in context.
         """
-        messages = list(context)
-        latest_user_prompt = ""
+        ctx = list(context)
+        _logger.debug("MockEngine received context with %d messages", len(ctx))
+        response = str(self._count)
+        self._count += 1
+        return response
 
-        for message in reversed(messages):
-            if message.role == "user":
-                latest_user_prompt = message.content
-                break
-
-        return self.run(latest_user_prompt)

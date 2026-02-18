@@ -31,30 +31,6 @@ class BaseContext(ABC):
         return iter(self.get_messages())
 
 
-    def serialize(self) -> JSON_DICT:
-        """
-        Serialize the context to a JSON-serializable dictionary.
-        """
-        return {"messages": [message.serialize() for message in self.get_messages()]}
-
-    @classmethod
-    def deserialize(cls:Type[SerType], data: JSON_DICT) -> SerType:
-        """
-        Deserialize a context from a JSON dictionary.
-        """
-        messages_data = data.get("messages")
-        if not isinstance(messages_data, list):
-            raise ValueError("Invalid context data: 'messages' must be a list")
-
-        messages = []
-        for message_data in messages_data:
-            if not isinstance(message_data, dict):
-                raise ValueError("Invalid context data: each message must be a dict")
-            messages.append(Message.deserialize(message_data))
-
-        return cls(messages) # type: ignore
-
-
 class SimpleContext(BaseContext):
     """
     Concrete implementation of Context that holds a list of messages.
