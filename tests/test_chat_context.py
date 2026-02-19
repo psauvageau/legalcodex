@@ -1,9 +1,9 @@
 import unittest
 
-from legalcodex.engine import Engine
-from legalcodex.message import Message
-from legalcodex.chat.chat_context import ChatContext
-from legalcodex.engines.mock_engine import MockEngine
+from legalcodex.ai.engine import Engine
+from legalcodex.ai.message import Message
+from legalcodex.ai.chat.chat_context import ChatContext
+from legalcodex.ai.engines.mock_engine import MockEngine
 
 
 

@@ -3,13 +3,14 @@ Conversation Context.
 """
 import logging
 from typing import Final, Optional, Iterable, Type, TypeVar
+import json
 
-from .._types import JSON_DICT
+from ...exceptions import ValueError
+from ..._types import JSON_DICT
+
 from ..engine import Engine
 from ..message import Message
 from ..context import BaseContext
-import json
-from ..exceptions import ValueError
 
 from .chat_summarizer import summarize_overflow
 

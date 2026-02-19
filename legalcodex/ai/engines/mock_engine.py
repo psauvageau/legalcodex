@@ -2,9 +2,11 @@ from __future__ import annotations
 from typing import Final
 import logging
 
+from ..._config import Config, MockConfig
+
 from ..engine import Engine
 from ..context import Context
-from .._config import Config, MockConfig
+
 
 _logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from typing import Optional
 
 from ._types import JSON_DICT
 from ._misc import CONFIG_PATH
-from ._models import DEFAULT_MODEL
+from .ai.engines._models import DEFAULT_MODEL
 
 DEFAULT_FILE = CONFIG_PATH
 

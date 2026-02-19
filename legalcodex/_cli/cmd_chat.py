@@ -5,8 +5,8 @@ import argparse
 import os
 from contextlib import closing
 
-from ..chat.chat_behaviour import ChatBehaviour
-from ..chat.chat_context import ChatContext
+from ..ai.chat.chat_behaviour import ChatBehaviour
+from ..ai.chat.chat_context import ChatContext
 from ..exceptions import LCException
 
 from .engine_cmd import EngineCommand

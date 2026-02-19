@@ -3,7 +3,6 @@ from typing import Optional, Final
 from dataclasses import dataclass
 
 from ..engine import Engine
-from ..context import Context, SimpleContext
 from ..message import Message
 
 _logger = logging.getLogger(__name__)

@@ -1,34 +1,57 @@
 # Copilot Instructions for legalcodex
 
 ## Big picture
-- Python CLI to talk to LLMs via a pluggable engine. Entry point `legalcodex/__main__.py` wires global flags (`--config`, `--verbose`, `--test`) and subcommands. Single subcommand today: `test` in `legalcodex/_cli/cmd_test.py`.
-- Data flow: CLI args ➜ load `Config` from `config.json` ➜ construct `OpenAIEngine` ➜ `Engine.run(prompt)` ➜ build OpenAI messages ➜ `chat.completions.create` ➜ print first choice content.
-- Why this shape: commands stay small/testable; engine can be swapped by subclassing `Engine`.
+- Python CLI application to talk to LLMs via a pluggable engine abstraction.
+- Entry point `legalcodex/__main__.py` wires global flags (`--config`, `--verbose`, `--test`, `--log-window`) and subcommands.
+- Current subcommands are `chat` (`legalcodex/_cli/cmd_chat.py`) and `test` (`legalcodex/_cli/cmd_test.py`).
+- Data flow: CLI args ➜ `Config.load(...)` ➜ `EngineCommand` builds selected engine via `legalcodex.ai._engine_selector.ENGINES` ➜ command builds `Context` ➜ `Engine.run_messages(context)` ➜ provider API call.
+- Why this shape: command code remains small/testable, and AI providers remain swappable behind the `Engine` interface.
 
 ## Architecture essentials
+
+### Command-Line-Interface (CLI)
+- All command-line interface implementation lives under `legalcodex/_cli/`.
 - Commands: subclass `CliCmd` with `title`, implement `run(self, args)` and optional `add_arguments`. Register by adding the class to `COMMANDS` in `__main__.py`.
-- Engine: `legalcodex/engine.py` defines `Engine` and `OpenAIEngine`. Messages are built in `build_messages(prompt)` using roles Literal[`system`, `user`, `assistant`, `tool`]. The default `SYSTEM_PROMPT` is intentionally sarcastic.
-- Config: `legalcodex/_config.py` reads `config.json` (`api_keys.openai`, optional `model`, default `gpt-4.1-mini`). Use `Config.load(path)`; do not access env directly here.
+
+### LLM Interaction
+- All code that interacts with LLMs live under `legalcodex/ai/`.
+- All code that interacts with LLMs must go through the `Engine` abstraction (`legalcodex/ai/engine.py`).
+
+- Engine: `legalcodex/ai/engine.py` defines the abstract `Engine` base class (`run_messages(context)`), and concrete engines live under `legalcodex/ai/engines/`.
+- Engine selection: `legalcodex/ai/_engine_selector.py` maps engine names to concrete classes (currently `openai` and `mock`).
+- Chat state: conversation behavior lives under `legalcodex/ai/chat/` (`chat_behaviour.py`, `chat_context.py`, `chat_summarizer.py`).
+- Context/message types: `legalcodex/ai/context.py` and `legalcodex/ai/message.py`.
+
+### General Use
+
+- Config: `legalcodex/_config.py` reads `config.json` (`api_keys`, optional `model`, default from `legalcodex/ai/engines/_models.py`). Use `Config.load(path)`; do not access env directly in command logic.
+- Exceptions: all exceptions raised in command logic should be wrapped in `LCException` (or a subclass) with a user-friendly message. Log the original exception at DEBUG level for troubleshooting. LCException should provide an actionable message to the end-user without exposing internal details or stack traces.
 
 ## API-agnostic architecture requirements
 - All LegalCodex application logic must remain AI API agnostic.
 - Application logic must not rely on provider-specific features from the OpenAI API (or any single provider API).
-- All interactions with an LLM must go through the `Engine` abstract base class in `legalcodex/engine.py`.
-- `legalcodex/engines/openai_engine.py` provides a concrete implementation of `Engine`.
+- All interactions with an LLM must go through the `Engine` abstract base class in `legalcodex/ai/engine.py`.
+- `legalcodex/ai/engines/openai_engine.py` is a concrete implementation of `Engine`.
 - This abstraction must be preserved so another LLM API can be adopted later with minimal changes to command and business logic.
 
 ## Project Layout
 
 - `legalcodex/' contains the python source-code, organized into:
   - `__main__.py`: CLI entry point, command registry, logging setup.
-  - `_cli/`: directory for CLI command implementations.
-  - `engine.py`: engine abstraction and OpenAI integration.
+  - `_cli/`: CLI command implementations (`cmd_chat.py`, `cmd_test.py`, `engine_cmd.py`).
   - `_config.py`: config dataclass and JSON loader.
+  - `ai/`: provider-agnostic AI domain:
+    - `engine.py`: abstract engine contract.
+    - `_engine_selector.py`: engine registry.
+    - `context.py`, `message.py`: context/message primitives.
+    - `chat/`: chat behavior and context management.
+    - `engines/`: concrete engines (`openai_engine.py`, `mock_engine.py`, `_models.py`).
+  - `exceptions.py`: app exceptions (`LCException`, provider/domain-specific subclasses).
 
 - `tests/` contains automated test files.
 - `config.json` is the expected config file for API keys and settings; it is gitignored.
 - `pytest.ini` and `mypy.ini` configure testing and type checking.
-- `planning` contrains design docs and notes in markdown files, intended to be used by the copilot agent.
+- `planning/` contains design docs and milestone notes in markdown files.
 - `.work` contains irrelevant files that should be ignored by copilot.
 
 
@@ -37,15 +60,18 @@
 - Install/editable: pip install -e .
 - Run help: python -m legalcodex --help
 - Example run: python -m legalcodex test "Summarize this NDA in 3 bullets."
+- Example run (chat): python -m legalcodex chat
+- Example run (chat without loading prior history): python -m legalcodex chat --no-load
 - Debug logging: add `-v` to enable DEBUG; noisy libs are silenced in `init_log`.
-- Tests: pytest with coverage is configured in `pytest.ini`; current suite is minimal (`tests/test_placeholder.py`).
-- Type checking: run mypy legalcodex/ (note: `mypy.ini`'s files target appears stale; prefer explicit path).
+- Tests: run `pytest` (current suite includes chat behavior/context tests).
+- Type checking: run `mypy --strict legalcodex`.
 
 ## Conventions and patterns
-- Message roles are constrained by `Role = Literal["system","user","assistant","tool"]`; build messages via `_message(role, content)`.
-- Model selection comes exclusively from `Config.model`; there is no CLI override yet.
-- The `test` command requires a positional `prompt`; it loads config and prints the first completion.
-- Avoid logging secrets; `Config.load` expects keys under `api_keys.openai` in `config.json`.
+- Message roles are constrained in `legalcodex/ai/message.py`; contexts passed to engines are `Context` collections of `Message`.
+- Model selection is resolved by `Engine` using explicit CLI `--model` override first, then `Config.model`, then engine default.
+- Engine selection is done through `--engine` and `ENGINES` mapping.
+- `cmd_test` requires positional `prompt`; `cmd_chat` maintains chat history and supports commands (`help`, `history`, `reset`, `exit`/`quit`).
+- Avoid logging secrets; API keys are read from `config.json` under `api_keys`.
 
 ### Logging
 - all files should have a module-level logger (`_logger = logging.getLogger(__name__)`) and use it for all logging.
@@ -54,23 +80,30 @@
 - The INFO level should be relevant to the end-user
 
 ### Error handling
-Generally, standard exceptions and third-party exceptions (e.g. from OpenAI) should not be allowed to reach the end-user. Instead, they should be caught and re-raised as `LegalCodexError` with a user-friendly message. The original exception should be logged at the DEBUG level for troubleshooting.
+Generally, standard exceptions and third-party exceptions (e.g. from OpenAI) should not be allowed to reach the end-user. Instead, catch and re-raise as `LCException` (or a subclass such as `QuotaExceeded`) with a user-friendly message. Log the original exception at DEBUG level for troubleshooting.
 
 ## Integration points
 - External API: openai Chat Completions via `OpenAI().chat.completions.create(model, messages=...)`.
-- Swap engine: create a new subclass of `Engine` with a `run(prompt)->str` and use it in commands instead of `OpenAIEngine`.
+- Token usage accounting exists in `OpenAIEngine` via `TokenCounter`.
+- Swap engine: create a new subclass of `Engine` implementing `run_messages(context)->str`, then register it in `legalcodex/ai/_engine_selector.py`.
 
 ## File map (start here)
 - legalcodex/__main__.py — CLI bootstrap, logging, command registry
 - legalcodex/_cli/cli_cmd.py — command base contract
-- legalcodex/_cli/cmd_test.py — reference command using `OpenAIEngine`
-- legalcodex/engine.py — engine abstraction, message building, OpenAI call
+- legalcodex/_cli/engine_cmd.py — common engine init and shared args (`--engine`, `--model`)
+- legalcodex/_cli/cmd_chat.py — interactive chat command
+- legalcodex/_cli/cmd_test.py — one-shot prompt command
 - legalcodex/_config.py — config dataclass and JSON loader
+- legalcodex/ai/engine.py — engine abstraction
+- legalcodex/ai/_engine_selector.py — engine registry
+- legalcodex/ai/engines/openai_engine.py — OpenAI adapter
+- legalcodex/ai/chat/chat_context.py — persisted chat context logic
 - pytest.ini, mypy.ini — test/typing config (see notes above)
 
 ## Quick examples
 - New command skeleton: create `legalcodex/_cli/cmd_myfeature.py` with a `title` and `run`; add to `COMMANDS`.
-- Adjust system tone: edit `SYSTEM_PROMPT` in `engine.py` (impacts all calls).
+- New engine skeleton: implement `Engine.run_messages` in `legalcodex/ai/engines/` and add to `ENGINES` in `legalcodex/ai/_engine_selector.py`.
+- Adjust chat defaults: update `DEFAULT_SYSTEM_PROMPT` / `DEFAULT_MAX_TURN` in `legalcodex/_cli/cmd_chat.py`.
 
 ## Copilot skills
 

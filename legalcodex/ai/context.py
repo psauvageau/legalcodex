@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import logging
 from typing import Iterable, Type, Iterator
 
-from ._types import JSON_DICT, SerType
+from .._types import JSON_DICT, SerType
 from .message import Message
 
 _logger = logging.getLogger(__name__)

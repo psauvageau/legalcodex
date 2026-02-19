@@ -15,7 +15,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from ..engine import Engine
 from ..context import Context
 from ..message import Message
-from ..exceptions import LCException, QuotaExceeded
+from ...exceptions import LCException, QuotaExceeded
 
 
 _logger = logging.getLogger(__name__)

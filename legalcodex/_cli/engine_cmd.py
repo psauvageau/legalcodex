@@ -4,8 +4,8 @@ import argparse
 import logging
 
 
-from ..engine import Engine
-from .._engine_selector import ENGINES, DEFAULT_ENGINE
+from ..ai.engine import Engine
+from ..ai._engine_selector import ENGINES, DEFAULT_ENGINE
 from .._config import Config
 
 from .cli_cmd import CliCmd

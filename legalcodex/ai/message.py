@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Literal, cast, TypeAlias, get_args
 
-from ._types import JSON_DICT
+from .._types import JSON_DICT
 
 Role            = Literal["system", "user", "assistant", "tool"]
 _VALID_ROLES    = frozenset(get_args(Role))
