@@ -48,6 +48,8 @@ class ChatBehaviour:
         return response
 
 
+
+
     #Used only for testing to inspect the message history
     @property
     def history(self) -> list[Message]:

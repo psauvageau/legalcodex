@@ -37,6 +37,13 @@ class Engine(ABC):
         _logger.info(f"Engine: '{self.name}'")
         _logger.info(f"Model:  '{self._model}'")
 
+    def close(self)->None:
+        """
+        Clean up any resources used by the engine.
+        Override this method if your engine needs to do any cleanup.
+        """
+        pass
+
     @property
     def config(self)->Config:
         return self._config

@@ -95,7 +95,7 @@ def init_log(verbose:bool, enable_log_window: bool)->Generator[None, None, None]
     if enable_log_window:
         with log_window():
             yield
-        input("Press Enter to exit...")
+            input("Press Enter to exit...")
     else:
         handler = logging.StreamHandler()
         handler.setLevel(level)

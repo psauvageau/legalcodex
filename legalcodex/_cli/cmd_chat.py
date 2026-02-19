@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import argparse
 import os
+from contextlib import closing
 
 from ..chat.chat_behaviour import ChatBehaviour
 from ..chat.chat_context import ChatContext
@@ -61,36 +62,38 @@ class CommandChat(EngineCommand):
 
     def run(self, args: argparse.Namespace) -> None:
         super().run(args)
+        with closing(self.engine):
 
-        chat_context = self._get_chat_context(args)
+            chat_context = self._get_chat_context(args)
 
-        chat = ChatBehaviour(self.engine, chat_context)
+            chat = ChatBehaviour(self.engine, chat_context)
 
-        commands = ChatCommands(chat)
+            commands = ChatCommands(chat)
 
-        write("Starting interactive chat session. Type 'help' for commands.")
-        while True:
-            try:
-                prompt = input("You> ").strip()
-                if not prompt:
-                    write("Please enter a message or type 'help'.")
+            write("Starting interactive chat session. Type 'help' for commands.")
+            while True:
+                try:
+                    prompt = input("You> ").strip()
+                    if not prompt:
+                        write("Please enter a message or type 'help'.")
+                        continue
+
+                    commands.execute(prompt)
+
+                    response = chat.send_message(prompt)
+                    write(f"AI > {response}")
+
+                except CommandExecutedException:
                     continue
 
-                commands.execute(prompt)
+                except LCException as e:
+                    write(f"Error: {e}")
 
-                response = chat.send_message(prompt)
-                write(f"AI > {response}")
+                except (KeyboardInterrupt, ExitException):
+                        write("Exiting chat session.")
+                        chat.context.save(FILE_NAME)
 
-            except CommandExecutedException:
-                continue
-
-            except LCException as e:
-                write(f"Error: {e}")
-
-            except (KeyboardInterrupt, ExitException):
-                    write("Exiting chat session.")
-                    chat.context.save(FILE_NAME)
-                    break
+                        break
 
 def write(msg:str)->None:
     _logger.info(msg)
