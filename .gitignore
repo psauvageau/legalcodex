@@ -12,3 +12,5 @@ htmlcov/
 
 
 api_key.json
+config.json
+chat_context.json

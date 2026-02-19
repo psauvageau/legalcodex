@@ -1,0 +1,4 @@
+[run]
+omit =
+    legalcodex/_cli/*
+    legalcodex/__main__.py
