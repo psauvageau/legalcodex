@@ -3,7 +3,9 @@ import unittest
 from legalcodex._config import Config
 from legalcodex.chat.chat_behaviour import ChatBehaviour
 from legalcodex.engines.mock_engine import MockEngine
-from legalcodex.engine import Engine, Context, Message
+from legalcodex.engine import Engine
+from legalcodex.context import Context
+from legalcodex.message import Message
 from legalcodex.chat.chat_context import ChatContext
 
 

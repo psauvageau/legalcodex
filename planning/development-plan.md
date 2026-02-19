@@ -23,6 +23,7 @@ Build a conversational legal assistant that can search a large document library 
 - Create loader interfaces and concrete loaders by file type
 - Normalize extracted text and metadata (source path, page/chunk)
 - Chunk documents with stable chunk IDs
+- Detailed implementation plan: [Milestone B — Document Ingestion](milestone-b-document-ingestion.md)
 
 ### C. Indexing & Retrieval
 - Start with baseline lexical search (e.g., BM25/keyword)

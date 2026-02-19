@@ -17,7 +17,8 @@
         "/^python -m legalcodex --help$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "mypy": true
     },
     "cSpell.words": [
         "behavior",
