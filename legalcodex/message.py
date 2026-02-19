@@ -34,8 +34,8 @@ class Message:
         if not isinstance(content, str):
              raise ValueError(f"Invalid content type in message: expected str, got {type(content).__name__}")
 
-        return cls(role=cast(Role, role),
-            content=cast(str, content))
+        return cls( role=cast(Role, role),
+                    content=content)
 
 
     @classmethod

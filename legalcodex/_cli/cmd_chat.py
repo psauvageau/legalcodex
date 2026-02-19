@@ -68,31 +68,34 @@ class CommandChat(EngineCommand):
 
         commands = ChatCommands(chat)
 
-        _logger.info("Starting interactive chat session. Type 'help' for commands.")
+        write("Starting interactive chat session. Type 'help' for commands.")
         while True:
             try:
                 prompt = input("You> ").strip()
                 if not prompt:
-                    _logger.info("Please enter a message or type 'help'.")
+                    write("Please enter a message or type 'help'.")
                     continue
 
                 commands.execute(prompt)
 
                 response = chat.send_message(prompt)
-                _logger.info("AI > %s", response)
+                write(f"AI > {response}")
 
             except CommandExecutedException:
                 continue
 
             except LCException as e:
-                _logger.info("Error: %s", e)
+                write(f"Error: {e}")
 
             except (KeyboardInterrupt, ExitException):
-                    _logger.info("\nExiting chat session.")
+                    write("Exiting chat session.")
                     chat.context.save(FILE_NAME)
                     break
 
-
+def write(msg:str)->None:
+    _logger.info(msg)
+    print(msg)
+    print()
 
 
 class ChatCommands:
@@ -107,12 +110,12 @@ class ChatCommands:
 
         def help()->None:
             cmds = ", ".join(self._commands.keys())
-            _logger.info("Commands: %s", cmds)
+            write(f"Commands: {cmds}")
 
         def history()->None:
             messages = self._chat.context.get_messages()
             for msg in messages:
-                _logger.info("%s: %s", msg.role, msg.content)
+                write(f"{msg.role}: {msg.content}")
 
         self._commands = {      "exit": exit,
                                 "quit": exit,

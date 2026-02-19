@@ -52,7 +52,7 @@ class OpenAIEngine(Engine):
                 ]
 
             response = self.client.chat.completions.create(
-                model=self.config.model,
+                model=self.model,
                 messages=messages,
             )
 
@@ -73,10 +73,6 @@ class OpenAIEngine(Engine):
         except Exception as e:
             _logger.exception("OpenAI request failed")
             raise LCException("The AI request failed. Please try again.") from e
-
-
-
-
 
 def _message(message:Message)->ChatCompletionMessageParam:
     """

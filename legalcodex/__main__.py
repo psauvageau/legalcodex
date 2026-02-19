@@ -19,6 +19,8 @@ COMMANDS :List[Type[CliCmd]] = [
     # Add new command classes here
 ]
 
+_logger = logging.getLogger(__name__)
+
 
 def main()->None:
     """
@@ -26,11 +28,10 @@ def main()->None:
     """
     args: argparse.Namespace = _get_args(COMMANDS)
 
-    init_log(args.verbose)
 
     if args.command:        # Execute the command
         try:
-            with _log_context(args.log_window):
+            with init_log(args.verbose, args.log_window):
                 args.command.run(args)
         except LCException as e:
             logging.error("Error: %s", e)
@@ -38,23 +39,6 @@ def main()->None:
     else:
         print(f"No command specified. [{", ".join([cmd.title for cmd in COMMANDS])}]")
         exit(1)
-
-
-@contextmanager
-def _log_context(enable_log_window: bool) -> Generator[None, str, None]:
-    """
-    Context manager for the log window. If log_window is True, it will create a log window and attach a logging handler to it.
-    The log window will display log messages emitted while the context is active.
-    """
-    if enable_log_window:
-        with log_window():
-            yield
-        input("Press Enter to exit...")
-    else:
-        yield
-
-
-
 
 
 def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
@@ -81,24 +65,21 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
 
     return parser.parse_args()
 
-
-
-def init_log(verbose:bool)->None:
+@contextmanager
+def init_log(verbose:bool, enable_log_window: bool)->Generator[None, None, None]:
     """
     Initialize the logging configuration.
 
     Args:
         verbose (bool): If True, set logging level to DEBUG, otherwise INFO.
     """
-    if verbose:
-        level = logging.DEBUG
-
-    else:
-        level = logging.INFO
+    level = logging.DEBUG if verbose else logging.INFO
 
     format = "%(levelname)-8s - %(name)-20s - %(message)s"
 
-    logging.basicConfig(level=level, format=format)
+    #logging.basicConfig(level=level, format=format)
+
+
 
     silence = ["httpx",
                "google_genai.models",
@@ -106,6 +87,25 @@ def init_log(verbose:bool)->None:
 
     for name in silence:
         logging.getLogger(name).setLevel(logging.WARNING)
+
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    if enable_log_window:
+        with log_window():
+            yield
+        input("Press Enter to exit...")
+    else:
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        handler.setFormatter(logging.Formatter(format))
+        root_logger.addHandler(handler)
+        try:
+            logging.getLogger().info("Logging initialized. Level: %s", logging.getLevelName(level))
+            yield
+        finally:
+            logging.getLogger().removeHandler(handler)
 
 if __name__ == "__main__":
     main()

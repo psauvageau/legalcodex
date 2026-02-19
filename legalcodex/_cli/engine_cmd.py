@@ -25,7 +25,8 @@ class EngineCommand(CliCmd):
         """
         assert self._engine is None, "Engine already initialized"
         config = Config.load(args.config)
-        self._engine  :Engine = ENGINES[args.engine](config)
+
+        self._engine  :Engine = ENGINES[args.engine](config, args.model)
 
         _logger.info("Initialized engine: %s", self.engine.name)
 
@@ -37,6 +38,7 @@ class EngineCommand(CliCmd):
         Override this method to add command specific arguments
         """
         parser.add_argument('--engine',    '-e',action="store", type=str, default=DEFAULT_ENGINE, choices=ENGINES.keys(), help='Specify the engine to use')
+        parser.add_argument('--model',    '-m',action="store", type=str, default=None,  help='Open the log window')
 
     @property
     def engine(self)->Engine:

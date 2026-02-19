@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Final, Literal, Iterable, get_args, cast
+from typing import Final, Literal, Iterable, get_args, cast, Optional
 from abc import ABC, abstractmethod
 
 
@@ -14,20 +14,9 @@ from ._config import Config
 from .exceptions import ValueError
 from .message import Message
 from .context import Context
+from ._models import MODELS, DEFAULT_MODEL
 
 _logger = logging.getLogger(__name__)
-
-
-
-
-
-
-
-
-
-
-
-
 
 class Engine(ABC):
     """
@@ -37,13 +26,16 @@ class Engine(ABC):
     They must also have a class attribute NAME which is used to identify the engine type.
     """
     _config : Final[Config]
+    _model  : Final[str]
 
-    def __init__(self, config: Config)->None:
+    def __init__(self, config: Config, model:Optional[str]=None)->None:
         """
         Initialize the Engine with the given configuration.
         """
         self._config = config
-
+        self._model = _get_model(config, model)
+        _logger.info(f"Engine: '{self.name}'")
+        _logger.info(f"Model:  '{self._model}'")
 
     @property
     def config(self)->Config:
@@ -57,7 +49,9 @@ class Engine(ABC):
         assert hasattr(self, "NAME"), "Engine subclass must have a NAME class attribute"
         return self.NAME # type: ignore
 
-
+    @property
+    def model(self)->str:
+        return self._model
 
     @abstractmethod
     def run_messages(self, context:Context)->str:
@@ -65,3 +59,21 @@ class Engine(ABC):
         Run the engine with a full conversational context and return the response.
         """
         pass
+
+
+
+
+def _get_model(config:Config, model:Optional[str])->str:
+    """
+    Get the model to use from the config,
+    applying any necessary defaults or overrides.
+    """
+    val:str = DEFAULT_MODEL
+    if model is not None:
+        val = model
+    elif config.model is not None:
+        val = config.model
+
+    if val not in MODELS:
+        raise ValueError(f"Model '{val}' is not supported. Available models: {", ".join(MODELS)}")
+    return val

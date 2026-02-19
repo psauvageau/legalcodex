@@ -14,11 +14,13 @@ class MockEngine(Engine):
     """
     NAME : Final[str]  = "mock"
 
-    def __init__(self, config:Config=None)->None: #type: ignore
+    _count:int = 0
+
+    def __init__(self, config:Config=None, model:Optional[str]=None)->None: #type: ignore
         self._count:int = 0
         if config is None:
             config = MockConfig()
-        super().__init__(config=MockConfig()) # type: ignore
+        super().__init__(config=config, model=model)
 
     @property
     def count(self)->int:

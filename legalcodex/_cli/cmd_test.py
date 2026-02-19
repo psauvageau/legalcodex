@@ -7,8 +7,10 @@ import logging
 from .engine_cmd import EngineCommand
 
 from .._config import Config
-from ..engine import Engine, Context, Message
-from .._engine_selector import ENGINES, DEFAULT_ENGINE
+from ..engine import Engine
+from ..context import Context
+from ..message import Message
+
 
 _logger = logging.getLogger(__name__)
 

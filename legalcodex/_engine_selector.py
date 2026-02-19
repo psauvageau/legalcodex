@@ -14,4 +14,4 @@ ENGINES : dict[str, Type[Engine]] = {
 }
 
 
-DEFAULT_ENGINE = MockEngine.NAME
+DEFAULT_ENGINE = OpenAIEngine.NAME
