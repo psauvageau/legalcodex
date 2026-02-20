@@ -13,6 +13,7 @@ In scope:
 - Prompt submission API.
 - Streaming response transport for incremental text.
 - Error model and status codes.
+- HTTPS/TLS serving strategy and trusted proxy handling.
 
 Out of scope (for this milestone):
 - Authentication/authorization strategy beyond placeholder hooks.
@@ -22,6 +23,20 @@ Out of scope (for this milestone):
 
 ## Proposed API Shape
 Base path: `/api/v1`
+
+### Transport Security (HTTPS)
+- All production API traffic must use HTTPS.
+- The server must support one of these deployment modes:
+  - **Mode A (edge TLS termination, recommended):** HTTPS terminates at reverse proxy/load balancer (Nginx/Caddy/Traefik/IIS/Cloud LB), app listens on localhost/private HTTP.
+  - **Mode B (direct TLS in app server):** ASGI server started with certificate and private key.
+- If behind a trusted proxy, app must trust forwarded proto headers only from trusted proxy hops and treat requests as secure when `X-Forwarded-Proto=https` (or equivalent standardized forwarded header).
+- HTTP on public interfaces should redirect to HTTPS (301/308), except local development.
+- Reject insecure cookies in production by setting `Secure` on auth/session cookies.
+
+Minimum production response headers:
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY` (or CSP frame-ancestors policy)
 
 
 ### 0) Status
@@ -229,12 +244,24 @@ The API must require user login with `username/password` and store an access key
   - Per-user unique salt (handled by the algorithm).
 - On successful login, server sets an **HttpOnly secure cookie**:
   - `Set-Cookie: lc_access=<opaque_session_key>; HttpOnly; Secure; SameSite=Lax; Path=/api/v1; Max-Age=900`
+- Cookie policy by environment:
+  - Production: `Secure=true` (required), `HttpOnly=true`, `SameSite=Lax` (or `Strict` if UX allows).
+  - Local dev over plain HTTP: allow override for `Secure=false` only in explicit development mode.
 - Rotate session/access key at login and refresh.
 - Expire idle/old sessions and support explicit logout.
 - Rate-limit login attempts and apply temporary lockout on repeated failures.
 - Use generic login error messages (do not reveal whether username exists).
 - All endpoints served over HTTPS only.
 - Protect state-changing endpoints against CSRF (SameSite + CSRF token/header for unsafe methods).
+
+### Runtime TLS Configuration Requirements
+- Provide configuration keys for HTTPS behavior, for example:
+  - `https.enabled` (bool)
+  - `https.certfile` (path, required when direct TLS enabled)
+  - `https.keyfile` (path, required when direct TLS enabled)
+  - `https.redirect_http` (bool, default true in production)
+  - `https.trust_proxy` (bool) and `https.trusted_proxy_hops` (int)
+- On startup, fail fast with a clear error if HTTPS is required but cert/key or proxy trust settings are invalid.
 
 ---
 
@@ -363,3 +390,15 @@ Common codes:
 - Logout invalidates session and cookie.
 - Login endpoint enforces rate limits and safe error behavior.
 - Tests cover auth success/failure, cookie flags, protected routes, and streaming with auth.
+- Production deployment serves API over HTTPS and either:
+  - direct TLS is configured with valid cert/key, or
+  - reverse proxy TLS termination + trusted forwarded-proto handling is configured.
+- HTTP requests are redirected to HTTPS in production (except explicit local dev mode).
+- Security headers include HSTS and secure cookie behavior is verified in integration tests.
+
+## HTTPS Validation Checklist
+- `GET /api/v1/status` succeeds over `https://...`.
+- Session cookie includes `Secure; HttpOnly; SameSite` in production.
+- Calling `http://...` returns redirect to `https://...` (production mode).
+- App correctly identifies request scheme behind trusted proxy (`X-Forwarded-Proto=https`).
+- Misconfigured TLS startup (missing cert/key when required) fails with actionable error.
