@@ -82,6 +82,7 @@ def init_log(verbose:bool, enable_log_window: bool)->Generator[None, None, None]
 
 
     silence = ["httpx",
+               "openai._base_client",
                "google_genai.models",
                "httpcore"]
 

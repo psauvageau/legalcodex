@@ -36,7 +36,7 @@ def summarize_overflow( engine:Engine,
                 "Merge and compress the following older conversation turns into a short summary:\n"\
                 f"{summary_input.content}")
     )
-    summary_text :str = engine.run_messages(messages).strip()
+    summary_text :str = engine.run_messages_stream(messages).all().strip()
 
     if not summary_text:
         _logger.warning("Received empty overflow summary")

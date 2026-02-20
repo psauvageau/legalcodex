@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import Final
+from typing import Final, Optional, Iterator
 import logging
 
 from ..._config import Config, MockConfig
 
 from ..engine import Engine
 from ..context import Context
+from ..stream import Stream
 
 
 _logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class MockEngine(Engine):
         return self._count
 
 
-    def run_messages(self, context:Context)->str:
+    def run_messages_stream(self, context:Context)->Stream:
         """
         Return a deterministic response based
         on the latest user message in context.
@@ -38,5 +39,15 @@ class MockEngine(Engine):
         _logger.debug("MockEngine received context with %d messages", len(ctx))
         response = str(self._count)
         self._count += 1
-        return response
+        return _TextStream(response)
+
+
+
+
+class _TextStream(Stream):
+    def __init__(self, text:str)->None:
+        self._text = text
+
+    def __iter__(self)->Iterator[str]:
+        yield self._text
 

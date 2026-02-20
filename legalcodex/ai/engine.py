@@ -15,6 +15,7 @@ from ..exceptions import ValueError
 
 from .message import Message
 from .context import Context
+from .stream import Stream
 from .engines._models import MODELS, DEFAULT_MODEL
 
 _logger = logging.getLogger(__name__)
@@ -61,12 +62,16 @@ class Engine(ABC):
     def model(self)->str:
         return self._model
 
+
+
     @abstractmethod
-    def run_messages(self, context:Context)->str:
+    def run_messages_stream(self, context:Context)->Stream:
         """
-        Run the engine with a full conversational context and return the response.
+        Run the engine with a full conversational context and return a response stream.
         """
         pass
+
+
 
 
 

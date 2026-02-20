@@ -7,6 +7,7 @@ from contextlib import closing
 
 from ..ai.chat.chat_behaviour import ChatBehaviour
 from ..ai.chat.chat_context import ChatContext
+from ..ai.stream import Stream
 from ..exceptions import LCException
 
 from .engine_cmd import EngineCommand
@@ -80,8 +81,8 @@ class CommandChat(EngineCommand):
 
                     commands.execute(prompt)
 
-                    response = chat.send_message(prompt)
-                    write(f"AI > {response}")
+                    stream = chat.send_message(prompt)
+                    self.stream_handler(stream)
 
                 except CommandExecutedException:
                     continue
@@ -94,6 +95,12 @@ class CommandChat(EngineCommand):
                         chat.context.save(FILE_NAME)
 
                         break
+
+
+
+
+
+
 
 def write(msg:str)->None:
     _logger.info(msg)

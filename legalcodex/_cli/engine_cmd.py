@@ -5,6 +5,7 @@ import logging
 
 
 from ..ai.engine import Engine
+from ..ai.stream import Stream
 from ..ai._engine_selector import ENGINES, DEFAULT_ENGINE
 from .._config import Config
 
@@ -47,4 +48,15 @@ class EngineCommand(CliCmd):
         """
         assert self._engine is not None, "Engine not initialized"
         return self._engine
+
+
+    @classmethod
+    def stream_handler(cls, stream:Stream)->None:
+        chunks :list[str] = []
+        print("AI > ", end="", flush=True)
+        for chunk in stream:
+            print(chunk, end="", flush=True)
+            chunks.append(chunk)
+        print()
+        _logger.info("Stream complete. Full response: %s", "".join(chunks))
 

@@ -4,8 +4,9 @@ Represent an abstract AI API
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Final, Optional
+from typing import Final, Optional, Iterator, cast, Generator
 
 from openai import OpenAI, RateLimitError
 
@@ -15,12 +16,11 @@ from openai.types.chat import ChatCompletionMessageParam
 from ..engine import Engine
 from ..context import Context
 from ..message import Message
+from ..stream import Stream
 from ...exceptions import LCException, QuotaExceeded
-
+from ..._misc import log_timer
 
 _logger = logging.getLogger(__name__)
-
-
 
 class OpenAIEngine(Engine):
     """
@@ -29,8 +29,8 @@ class OpenAIEngine(Engine):
     NAME : Final[str]  = "openai"
 
     #typing only
-    _client : Optional[OpenAI] = None
-    _token_counter : Optional[TokenCounter] = None
+    _client         : Optional[OpenAI] = None
+    _token_counter  : Optional[TokenCounter] = None
 
     @property
     def client(self)->OpenAI:
@@ -43,35 +43,22 @@ class OpenAIEngine(Engine):
         return self._client
 
 
-    def run_messages(self, context: Context) -> str:
-        try:
-            messages: list[ChatCompletionMessageParam] = [
-                _message(message) for message in context
-                ]
+    def run_messages_stream(self, context: Context) -> Stream:
+        with _handle_exceptions():
+            messages = _context_to_messages(context)
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-            )
-            self.token_counter.add_tokens(response)
 
-            completion: ChatCompletion = response
-            for choice in completion.choices:
-                _logger.debug("Choice: %s", choice)
-
-            content = response.choices[0].message.content
-            if content is None:
-                raise LCException("Model returned an empty response")
-
-            return content
-        except RateLimitError:
-            _logger.exception("API quota exceeded")
-            raise QuotaExceeded(self.NAME) from None
-        except LCException:
-            raise
-        except Exception as e:
-            _logger.exception("OpenAI request failed")
-            raise LCException("The AI request failed. Please try again.") from e
+            with log_timer("OpenAI streaming response"):
+                stream = cast(
+                    Iterator[object],
+                    self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        stream=True,
+                    ),
+                )
+            #self.token_counter.add_tokens(stream) # type: ignore
+            return _OpenAIStream(stream, self.token_counter)
 
     @property
     def token_counter(self)->TokenCounter:
@@ -88,12 +75,45 @@ class OpenAIEngine(Engine):
             _logger.info("Total token usage for this session:")
             self._token_counter.log_usage(logging.INFO)
 
+def _context_to_messages(context:Context)->list[ChatCompletionMessageParam]:
+    """
+    Convert a Context to a list of ChatCompletionMessageParam.
+    """
+    return [
+        _message(message) for message in context
+    ]
+
 def _message(message:Message)->ChatCompletionMessageParam:
     """
     Create a message dictionary for the chat completion.
     """
     return {"role":     message.role,
             "content":  message.content} #type: ignore
+
+
+
+
+
+class _OpenAIStream(Stream):
+    def __init__(self, stream: Iterator[object], token_counter: TokenCounter)->None:
+        self._stream = stream
+        self._token_counter = token_counter
+
+    def __iter__(self)->Iterator[str]:
+        with _handle_exceptions():
+            for chunk in self._stream:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+
+                delta = getattr(choices[0], "delta", None)
+                if delta is None:
+                    continue
+
+                content = getattr(delta, "content", None)
+                if content:
+                    yield content
+        self._token_counter.add_tokens(self._stream) # type: ignore
 
 class TokenCounter:
     def __init__(self) -> None:
@@ -110,7 +130,7 @@ class TokenCounter:
 
 
 
-@dataclass()
+@dataclass
 class TokenCount:
     prompt_tokens:      int = 0
     completion_tokens:  int = 0
@@ -140,3 +160,15 @@ def _token_count(response:ChatCompletion)->TokenCount:
         total_tokens = usage.total_tokens or 0
     )
 
+@contextmanager
+def _handle_exceptions()->Generator[None, None, None]:
+    try:
+        yield
+    except RateLimitError:
+        _logger.exception("API quota exceeded")
+        raise QuotaExceeded() from None
+    except LCException:
+        raise
+    except Exception as e:
+        _logger.exception("OpenAI request failed")
+        raise LCException("The AI request failed. Please try again.") from e
