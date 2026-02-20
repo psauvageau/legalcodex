@@ -8,6 +8,7 @@ from .exceptions import LCException
 
 from ._cli.cli_cmd import CliCmd
 from ._cli.cmd_chat import CommandChat
+from ._cli.cmd_serve import CommandServe
 from ._cli.cmd_test import CommandTest
 
 from ._cli._log_window import log_window
@@ -15,6 +16,7 @@ from ._cli._log_window import log_window
 
 COMMANDS :List[Type[CliCmd]] = [
     CommandChat,
+    CommandServe,
     CommandTest,
     # Add new command classes here
 ]

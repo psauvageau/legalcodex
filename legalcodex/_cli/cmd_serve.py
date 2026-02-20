@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+import argparse
+import logging
+
+import uvicorn
+
+from ..exceptions import LCException
+from .cli_cmd import CliCmd
+
+_logger = logging.getLogger(__name__)
+
+
+class CommandServe(CliCmd):
+    title: str = "serve"
+
+    def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--host",
+            type=str,
+            default="127.0.0.1",
+            help="Host interface to bind the HTTP server",
+        )
+        parser.add_argument(
+            "--port",
+            type=int,
+            default=8000,
+            help="Port to bind the HTTP server",
+        )
+        parser.add_argument(
+            "--reload",
+            action="store_true",
+            help="Enable auto-reload for development",
+        )
+
+    def run(self, args: argparse.Namespace) -> None:
+        try:
+            _logger.info("Starting HTTP server on %s:%s", args.host, args.port)
+            uvicorn.run(
+                "legalcodex.http_server.app:app",
+                host=args.host,
+                port=args.port,
+                reload=args.reload,
+            )
+        except LCException:
+            raise
+        except Exception as ex:
+            _logger.debug("Failed to start HTTP server", exc_info=ex)
+            raise LCException("Failed to start HTTP server. Verify host/port and server configuration.") from ex
