@@ -26,7 +26,7 @@ class TestChatBehaviour(unittest.TestCase):
         chat_context = ChatContext(system_prompt="System prompt", max_messages=10)
         behaviour = ChatBehaviour(self.engine, chat_context)
 
-        response = behaviour.send_message("Hello")
+        response = behaviour.send_message("Hello").all()
 
         self.assertEqual("0", response)
         self.assertEqual(len(behaviour.history), 3)
@@ -67,7 +67,7 @@ class TestChatBehaviour(unittest.TestCase):
         self.assertEqual(behaviour.context._summary, "")
 
         for i in range(N):
-            behaviour.send_message(str(i))
+            behaviour.send_message(str(i)).all()
         self.assertEqual(engine.count, N)
 
         # After MAX turns, the history should be trimmed to MAX messages

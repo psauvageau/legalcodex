@@ -25,5 +25,5 @@ class ValueError(LCException):
 
 class QuotaExceeded(LCException):
     """Exception raised when API quota is exceeded."""
-    def __init__(self, api_name:str) -> None:
-        super().__init__(f"API quota exceeded for {api_name}")
+    def __init__(self) -> None:
+        super().__init__(f"API quota exceeded")

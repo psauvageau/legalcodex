@@ -23,9 +23,8 @@ class CommandTest(EngineCommand):
         super().run(args)
 
         context = _get_context(args.prompt)
-        response = self.engine.run_messages(context)
-        print("Response:")
-        print(response)
+        stream = self.engine.run_messages_stream(context)
+        self.stream_handler(stream)
 
 
     def add_arguments(self, parser:argparse.ArgumentParser)->None:
