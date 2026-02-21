@@ -4,9 +4,55 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LegalCodex</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <h1>LegalCodex</h1>
+    <main id="app" class="app">
+      <section v-if="viewState === 'loading'" class="card">
+        <h1>LegalCodex</h1>
+        <p>Checking session…</p>
+      </section>
+
+      <section v-else-if="viewState === 'unauthenticated'" class="card">
+        <h1>LegalCodex</h1>
+
+        <form @submit.prevent="submitLogin" class="form">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            v-model.trim="form.username"
+            @input="clearError"
+            autocomplete="username"
+            required
+          />
+
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            v-model="form.password"
+            @input="clearError"
+            autocomplete="current-password"
+            required
+          />
+
+          <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+          <button type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Signing in…' : 'Sign in' }}
+          </button>
+        </form>
+      </section>
+
+      <section v-else class="card">
+        <h1>LegalCodex</h1>
+        <p>You are signed in.</p>
+        <button @click="submitLogout" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Signing out…' : 'Sign out' }}
+        </button>
+      </section>
+    </main>
+
+    <script type="module" src="/js/auth-app.js"></script>
   </body>
 </html>

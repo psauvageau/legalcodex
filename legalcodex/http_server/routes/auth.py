@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 _logger = logging.getLogger(__name__)
@@ -13,6 +14,8 @@ router = APIRouter()
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
 
 
 @router.post("/auth/login", status_code=status.HTTP_204_NO_CONTENT)
@@ -38,3 +41,13 @@ def logout(response: Response) -> None:
         path="/api/v1",
     )
     _logger.info("Logout completed")
+
+
+@router.get("/auth/session", response_model=None)
+def session(request: Request) -> dict[str, bool] | JSONResponse:
+    access = request.cookies.get("lc_access")
+    if access == "GRANTED":
+        return {"authenticated": True}
+
+    return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                        content={"authenticated": False})

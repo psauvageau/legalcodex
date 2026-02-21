@@ -1,6 +1,7 @@
 from __future__ import annotations
 import sys
 import logging
+import mimetypes
 from typing import Final
 from pathlib import Path
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ FRONTEND_INDEX: Final[Path] = FRONTEND_DIR / "index.html"
 
 def create_app() -> FastAPI:
     _init_log(verbose=False)
+    _configure_static_mime_types()
     _logger.info("Initializing HTTP server application")
     app = FastAPI(title="legalcodex-http-server")
 
@@ -35,6 +37,11 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
     return app
+
+
+def _configure_static_mime_types() -> None:
+    mimetypes.add_type("application/javascript", ".js")
+    mimetypes.add_type("application/javascript", ".mjs")
 
 
 
