@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+import os
 
 from fastapi import APIRouter
 
@@ -17,5 +18,6 @@ def get_status() -> dict[str, str]:
     return {
         "status": "ok",
         "message": "LegalCodex HTTP API server is running",
+        "cwd": str(os.getcwd()),
         "timestamp_utc": timestamp,
     }

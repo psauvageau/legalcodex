@@ -8,9 +8,10 @@ from ._types import JSON_DICT
 from ._misc import CONFIG_PATH
 from .ai.engines._models import DEFAULT_MODEL
 
+from ._environ import LC_API_KEY
 
-# Name of the environment variable for the API key
-LC_API_KEY :Final[str] = "LC_API_KEY"
+
+
 
 DEFAULT_FILE = CONFIG_PATH
 
