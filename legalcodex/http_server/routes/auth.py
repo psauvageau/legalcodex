@@ -6,6 +6,10 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+
+from ..._user_access import UsersAccess
+
+
 _logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -20,7 +24,11 @@ class LoginRequest(BaseModel):
 
 @router.post("/auth/login", status_code=status.HTTP_204_NO_CONTENT)
 def login(payload: LoginRequest, response: Response) -> None:
-    if payload.username != "sauvp" or payload.password != "hello":
+
+    user_access = UsersAccess.get_instance()
+    user = user_access.authenticate(payload.username, payload.password)
+
+    if user is None:
         _logger.info("Login failed for user: %s", payload.username)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
