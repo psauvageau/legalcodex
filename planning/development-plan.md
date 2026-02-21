@@ -55,7 +55,7 @@ Build a conversational legal assistant that can search a large document library 
 - Detailed implementation plans:
 	- [Milestone C — Remote Chat API](milestone-c-remote-chat-api.md)
 	- [Milestone D — FastAPI Status-Only Server](milestone-d-fastapi-status-server.md)
-	- [Milestone D — SaaS Deployment](milestone-d-saas-deployment.md)
+	- [Milestone D — PaaS Deployment](milestone-d-paas-deployment.md)
 
 ## 4) Suggested Milestones
 - **Milestone 1:** Interactive chat command + conversation state
@@ -79,5 +79,5 @@ Build a conversational legal assistant that can search a large document library 
 - [Milestone B — Document Ingestion](milestone-b-document-ingestion.md)
 - [Milestone C — Remote Chat API](milestone-c-remote-chat-api.md)
 - [Milestone D — FastAPI Status-Only Server](milestone-d-fastapi-status-server.md)
-- [Milestone D — SaaS Deployment](milestone-d-saas-deployment.md)
+- [Milestone D — PaaS Deployment](milestone-d-paas-deployment.md)
 - [Chat App Notes](chat_app.md)

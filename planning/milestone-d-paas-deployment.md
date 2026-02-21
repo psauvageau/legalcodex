@@ -23,6 +23,23 @@ Out of scope:
 - Full authentication/authorization implementation.
 - Multi-region scaling and advanced SRE operations.
 
+## Definition
+### Edge TLS Termination
+
+**Edge TLS Termination** refers to the process of decrypting HTTPS/TLS encrypted traffic at the edge of a network (typically at a Content Delivery Network (CDN) or edge server location) rather than at the origin server.
+
+### Key Points:
+
+- **Location**: Occurs at edge servers geographically closer to end users, not at your main server
+- **Performance**: Reduces latency by handling encryption/decryption closer to users
+- **Flow**: User → Edge Server (TLS decrypted) → Origin Server (often via unencrypted connection)
+- **Use Case**: Common in PaaS deployments to improve response times and reduce origin server load
+- **Security Consideration**: Communication between edge and origin may use HTTP (unencrypted) on private networks, or HTTPS for additional security
+
+In the context of PaaS deployment, edge TLS termination improves user experience by serving encrypted content faster while distributing the computational load across edge infrastructure.
+
+
+
 ## Current Deployable Baseline
 Current implementation already provides a server entrypoint and status route:
 - CLI server command: `python -m legalcodex serve`
