@@ -13,7 +13,9 @@ router = APIRouter()
 @router.get("/status")
 def get_status() -> dict[str, str]:
     timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    _logger.debug("Received request for /status endpoint: %s", timestamp)
     return {
         "status": "ok",
+        "message": "LegalCodex HTTP API server is running",
         "timestamp_utc": timestamp,
     }

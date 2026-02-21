@@ -8,9 +8,11 @@
 .venv*/
 
 htmlcov/
-
+build/
 
 
 api_key.json
 config.json
 chat_context.json
+legalcodex.log
+lc_server.log

@@ -9,9 +9,16 @@ import logging
 import multiprocessing
 from multiprocessing import synchronize
 from queue import Empty
-import tkinter as tk
-from tkinter import ttk
 import time
+
+
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    TK_AVAILABLE = True
+except ImportError:
+    TK_AVAILABLE = False
+
 
 _logger = logging.getLogger(__name__)
 
@@ -24,6 +31,11 @@ def log_window()->Generator[None,None,None]:
     Context manager that creates a log window and attaches a logging handler to it.
     The log window will display log messages emitted while the context is active.
     """
+    if not TK_AVAILABLE:
+        _logger.warning("Tkinter is not available. Log window cannot be displayed.")
+        yield
+        return
+
     with closing(_LogWindowProcess()) as process:
         root_logger = logging.getLogger()
         handler = _LogHandler(process)
@@ -66,57 +78,58 @@ class _LogWindowProcess:
             self._ui_process.terminate()
             self._ui_process.join(timeout=1)
 
-class _Window(tk.Tk):
-    """
-    Contains the GUI elements and logic for the log window.
-    This is run in a separate process to avoid blocking the main application.
-    """
-    def __init__(self) -> None:
-        super().__init__()
+if TK_AVAILABLE:
+    class _Window(tk.Tk):
+        """
+        Contains the GUI elements and logic for the log window.
+        This is run in a separate process to avoid blocking the main application.
+        """
+        def __init__(self) -> None:
+            super().__init__()
 
-        self.title(TITLE)
-        self.geometry(GEOMETRY)
+            self.title(TITLE)
+            self.geometry(GEOMETRY)
 
-        frame = ttk.Frame(self, padding=10)
-        frame.pack(fill=tk.BOTH, expand=True)
+            frame = ttk.Frame(self, padding=10)
+            frame.pack(fill=tk.BOTH, expand=True)
 
-        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-
-        clear_button = ttk.Button(frame, text="Clear", command=self.on_clear)
-        clear_button.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+            scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
 
-
-        self.__text_widget = tk.Text(
-            frame,
-            wrap=tk.WORD,
-            state=tk.DISABLED,
-            yscrollcommand=scrollbar.set,
-        )
-        self.__text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.__text_widget.yview)
-
-    def on_clear(self) -> None:
-        # Clear the text widget content
-        self.__text_widget.config(state=tk.NORMAL)
-        self.__text_widget.delete(1.0, tk.END)
-        self.__text_widget.config(state=tk.DISABLED)
+            clear_button = ttk.Button(frame, text="Clear", command=self.on_clear)
+            clear_button.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
 
 
-    def add(self, message: str) -> None:
-        if not message:
-            return
 
-        self.__text_widget.config(state=tk.NORMAL)
-        self.__text_widget.insert(tk.END, f"{message}\n")
-        self.__text_widget.see(tk.END)
-        self.__text_widget.config(state=tk.DISABLED)
+            self.__text_widget = tk.Text(
+                frame,
+                wrap=tk.WORD,
+                state=tk.DISABLED,
+                yscrollcommand=scrollbar.set,
+            )
+            self.__text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.config(command=self.__text_widget.yview)
 
-    def close(self)->None:
-        self.quit()
-        self.destroy()
+        def on_clear(self) -> None:
+            # Clear the text widget content
+            self.__text_widget.config(state=tk.NORMAL)
+            self.__text_widget.delete(1.0, tk.END)
+            self.__text_widget.config(state=tk.DISABLED)
+
+
+        def add(self, message: str) -> None:
+            if not message:
+                return
+
+            self.__text_widget.config(state=tk.NORMAL)
+            self.__text_widget.insert(tk.END, f"{message}\n")
+            self.__text_widget.see(tk.END)
+            self.__text_widget.config(state=tk.DISABLED)
+
+        def close(self)->None:
+            self.quit()
+            self.destroy()
 
 
 

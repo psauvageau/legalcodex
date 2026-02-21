@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from typing import Final
 
 import uvicorn
 
@@ -10,6 +11,8 @@ from .cli_cmd import CliCmd
 
 _logger = logging.getLogger(__name__)
 
+HOST:Final[str] = "127.0.0.1"
+PORT:Final[int] = 8000
 
 class CommandServe(CliCmd):
     title: str = "serve"
@@ -18,19 +21,27 @@ class CommandServe(CliCmd):
         parser.add_argument(
             "--host",
             type=str,
-            default="127.0.0.1",
+            default=HOST,
             help="Host interface to bind the HTTP server",
         )
         parser.add_argument(
             "--port",
             type=int,
-            default=8000,
+            default=PORT,
             help="Port to bind the HTTP server",
         )
         parser.add_argument(
             "--reload",
             action="store_true",
             help="Enable auto-reload for development",
+        )
+
+        parser.add_argument(
+            "--workers",
+            action="store",
+            type=int,
+            default=1,
+            help="Number of worker processes for handling requests",
         )
 
     def run(self, args: argparse.Namespace) -> None:
@@ -41,6 +52,7 @@ class CommandServe(CliCmd):
                 host=args.host,
                 port=args.port,
                 reload=args.reload,
+                workers=args.workers,
             )
         except LCException:
             raise
