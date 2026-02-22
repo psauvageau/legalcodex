@@ -59,8 +59,6 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
         description="LegalCodex CLI Tool",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-
-    parser.add_argument('--config', '-c',action="store", type=str, default=None, help='Path to the config file')
     parser.add_argument('--verbose', '-v',action="store_true", help='Enable verbose output')
     parser.add_argument('--test',    '-t',action="store_true", help='Set Test Mode')
     parser.add_argument('--log-window',    '-l',action="store_true", help='Open the log window')

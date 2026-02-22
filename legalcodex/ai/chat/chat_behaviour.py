@@ -4,74 +4,63 @@ from dataclasses import dataclass
 import logging
 from typing import Optional, Final, TypeVar, Callable, Iterator
 
-
-from ..engine import Engine
 from ..stream import Stream
 from ..message import Message
 
-from .chat_context import ChatContext
+from ...exceptions import LCValueError, LCException
+from .chat_session import ChatSession
+
 
 _logger = logging.getLogger(__name__)
 
 
-
-
-T = TypeVar("T", bound="ChatBehaviour")
-
-
-
-StreamCallback = Callable[[str], None]
-
-
-
-class ChatBehaviour:
+def send_message(session:ChatSession, user_message: str) -> Stream:
     """
-    ChatBehaviour manages the conversation flow with an Engine,
-    maintaining context and history.
+    Send a user message to the engine and get the assistant's response.
+        - The user message is appended to the context history.
     """
-    DEFAULT_MAX_TURN: int = 99
+    prompt = user_message.strip()
+    if not prompt:
+        raise LCValueError("user_message must not be empty")
 
-    context : Final[ChatContext]
+    engine = session.engine
+    context = session.context
 
-    def __init__(self,engine: Engine, context : ChatContext)-> None:
-        self._engine  = engine
-        self.context = context
+    message = Message.User(prompt)
+    context.append(session.engine, message)
 
-    def send_message(self, user_message: str) -> Stream:
-        """
-        Send a user message to the engine and get the assistant's response.
-         - The user message is appended to the context history.
-        """
-        prompt = user_message.strip()
-        if not prompt:
-            raise ValueError("user_message must not be empty")
+    response = engine.run_messages_stream(context)
 
-        self.append_to_context(Message.User(prompt))
-        response = self._engine.run_messages_stream(self.context)
-        _logger.debug("Chat turn completed. History size=%d", len(self.context))
+    _logger.debug("Chat turn completed. History size=%d", len(context))
 
-        return _ChatStream(response, self)
+    def on_end(content:str)->None:
+        message= Message(role="assistant", content=content)
+        context.append(engine, message)
+        _logger.debug("Appended assistant message to context: %s", message)
 
-    def append_to_context(self, message: Message)->None:
-        """
-        Append a message to the context history without sending it to the engine.
-        Useful for adding system messages or other information.
-        """
-        self.context.append(self._engine, message)
+    return _ChatStream(response, on_end)
 
-    #Used only for testing to inspect the message history
-    @property
-    def history(self) -> list[Message]:
-        return list(self.context.get_messages())
 
+
+
+_StreamEndCallback = Callable[[str], None]
 
 class _ChatStream(Stream):
-    def __init__(self, stream: Stream, chat_behaviour: ChatBehaviour):
-        self._stream = stream
-        self._chat_behaviour = chat_behaviour
+    """
+    A wrapper around the engine's response stream with
+    a callback for when the stream ends.
+    """
+    _stream:Optional[Stream]
+    _callback: _StreamEndCallback
 
+    def __init__(self, stream: Stream, callback:_StreamEndCallback):
+        self._stream = stream
+        self._callback = callback
 
     def __iter__(self)-> Iterator[str]:
+        if self._stream is None:
+            raise LCException("Stream has already ended")
+
         chunks:list[str] = []
         try:
             chunk:str
@@ -80,6 +69,5 @@ class _ChatStream(Stream):
                 yield chunk
         finally:
             content = "".join(chunks)
-            msg= Message(role="assistant", content=content)
-            self._chat_behaviour.append_to_context(msg)
-            _logger.debug("Appended assistant message to context: %s", msg)
+            self._callback(content)
+            self._stream = None # Mark stream as ended to prevent further iteration

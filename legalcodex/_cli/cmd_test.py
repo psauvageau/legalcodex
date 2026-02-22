@@ -6,7 +6,6 @@ import logging
 
 from .engine_cmd import EngineCommand
 
-from .._config import Config
 from ..ai.engine import Engine
 from ..ai.context import Context
 from ..ai.message import Message

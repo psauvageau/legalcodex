@@ -5,7 +5,7 @@ import logging
 from typing import Final, Optional, Iterable, Type, TypeVar
 import json
 
-from ...exceptions import ValueError
+from ...exceptions import LCValueError
 from ..._types import JSON_DICT
 
 from ..engine import Engine
@@ -35,7 +35,7 @@ class ChatContext(BaseContext):
                         trim_length:Optional[int]=None) -> None:
 
         if max_messages <= 4:
-            raise ValueError("max_messages must be greater than 4 to allow for trimming")
+            raise LCValueError("max_messages must be greater than 4 to allow for trimming")
 
         self._system_prompt = Message("system", system_prompt.strip())
         self._max_messages = max_messages
@@ -120,7 +120,7 @@ class ChatContext(BaseContext):
         except Exception as err:
             _logger.error("Failed to deserialize context from data: %s", data)
             _logger.exception(err)
-            raise ValueError("Failed to deserialize context from data") from err
+            raise LCValueError("Failed to deserialize context from data") from err
 
 
 
