@@ -32,6 +32,15 @@
 - Tests: `pytest` (configured by `pytest.ini`, tests under `tests/`)
 - Type-checking: `mypy` (configured by `mypy.ini`)
 
+## API Documentation & References
+- **Markdown API Reference:** `API_Documentation.md` — comprehensive guide covering authentication, all endpoints, request/response formats, code examples (Python/JavaScript/curl), error handling, and best practices. Use this for understanding the current API surface.
+- **OpenAPI Specification:** `.github/legalcodex-api.openapi.yaml` — machine-readable OpenAPI 3.0.3 schema. Use this for:
+  - AI agents and tool integration (e.g., Claude, LangChain, OpenAI Function Calling)
+  - Generating SDK/client code
+  - Validating API contracts in tests
+  - IDE auto-completion and documentation generation
+- **Current API Endpoints:** `/api/v1/auth/login`, `/api/v1/auth/logout`, `/api/v1/auth/session`, `/api/v1/status`
+
 ## Integration points
 - OpenAI streaming call is in `legalcodex/ai/engines/openai_engine.py` via `OpenAI().chat.completions.create(..., stream=True)`.
 - HTTP auth routes (`legalcodex/http_server/routes/auth.py`) currently use a demo credential check and cookie `lc_access` scoped to `/api/v1`.
