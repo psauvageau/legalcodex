@@ -75,7 +75,6 @@ class CommandChat(EngineCommand):
 
                 except (KeyboardInterrupt, ExitException):
                         write("Exiting chat session.")
-                        session.context.save(FILE_NAME)
                         break
 
     @contextmanager

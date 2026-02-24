@@ -6,21 +6,25 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from typing import TypeVar, Type, Optional
+from typing import TypeVar, Type, Optional, Any, Final
 from uuid import uuid4
+
+
 
 from ..._types import JSON_DICT
 from ...exceptions import LCValueError
 from ..._user_access import User, UsersAccess
 from ..._misc import serialize_datetime, parse_datetime
+from ..._schema import ChatSessionSchema, EngineSchema
 
 from ..engine import Engine
 from .._engine_selector import ENGINES, DEFAULT_ENGINE
 from ..engines._models import MODELS, DEFAULT_MODEL
 
 
+
 from .chat_context import ChatContext
-from pydantic import BaseModel, Field
+
 
 _logger = logging.getLogger(__name__)
 
@@ -30,7 +34,7 @@ class ChatSession:
     """
     Represents a persisted chat session with context and engine metadata.
     """
-    _uid : str
+    _uid : Final[str]
     _context: ChatContext
     _user : User
     _created_at: datetime
@@ -65,29 +69,25 @@ class ChatSession:
 
 
 
-    def serialize(self) -> JSON_DICT:
-        data = ChatSessionData(
-            uid=self._uid,
-            username=self._user.username,
+    def serialize(self) -> ChatSessionSchema:
+        data = ChatSessionSchema(
+            uid=         self._uid,
+            username=    self._user.username,
             created_at = serialize_datetime(self._created_at),
-            context=self._context.serialize(),
-            engine_name=self._engine.name,
-            engine_model=self._engine.model,
+            context = self._context.serialize(),
+            engine=self._engine.serialize()
         )
-        return data.model_dump()
+        return data
 
 
     @classmethod
-    def deserialize(cls: Type[T], data: JSON_DICT) -> T:
-        chat_session_data = ChatSessionData.model_validate(data)
+    def deserialize(cls: Type[T], data: ChatSessionSchema) -> T:
+        user         = UsersAccess.get_instance().find(data.username)
+        context      = ChatContext.deserialize(data.context)
+        created_at   = parse_datetime(data.created_at)
+        engine       = Engine.deserialize(data.engine)
 
-        user         = UsersAccess.get_instance().find(chat_session_data.username)
-        context      = ChatContext.deserialize(chat_session_data.context)
-        created_at   = parse_datetime(chat_session_data.created_at)
-        engine       = _get_engine(chat_session_data.engine_name,
-                                    chat_session_data.engine_model)
-
-        return cls(uid = chat_session_data.uid,
+        return cls(uid = data.uid,
                    user=user,
                    context=context,
                    created_at=created_at,
@@ -117,7 +117,7 @@ class ChatSession:
 
     def save(self, filename: str) -> None:
         _logger.info("Saving chat session to file: %s", filename)
-        content = self.serialize()
+        content = self.serialize().model_dump()
         as_str = json.dumps(content, indent=2)
         with open(filename, "w", encoding="utf-8") as file_handle:
             file_handle.write(as_str)
@@ -126,7 +126,8 @@ class ChatSession:
     def load(cls: type[T], filename: str) -> T:
         with open(filename, "r", encoding="utf-8") as file_handle:
             data = json.load(file_handle)
-        return cls.deserialize(data)
+        cs = ChatSessionSchema.model_validate(data)
+        return cls.deserialize(cs)
 
 def _get_engine(name:Optional[str],
                 model:Optional[str])->Engine:
@@ -144,16 +145,3 @@ def _get_engine(name:Optional[str],
     return engine_cls(model=model)
 
 
-class ChatSessionData(BaseModel):
-    """
-    Serialization schema for ChatSession using Pydantic.
-    """
-    uid: str
-    username: str
-    created_at: str
-    context: JSON_DICT
-    engine_name: str
-    engine_model: str
-
-    class Config:
-        extra = "forbid"

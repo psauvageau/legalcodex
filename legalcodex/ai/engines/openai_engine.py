@@ -28,7 +28,7 @@ class OpenAIEngine(Engine):
     """
     An abstract AI engine interface.
     """
-    NAME : Final[str]  = "openai"
+    NAME : str  = "openai"
 
     #typing only
     _client         : Optional[OpenAI] = None

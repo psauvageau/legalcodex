@@ -6,6 +6,8 @@ from dataclasses import dataclass, asdict, field
 from ._types import JSON_DICT
 from .exceptions import UserNotFound
 
+from ._schema import UserSchema
+
 
 SGrp = NewType("SGrp", str) # Security Group
 
@@ -22,16 +24,28 @@ class User:
     password_hash: str
     security_groups: list[SGrp]
 
-    def serialize(self) -> JSON_DICT:
-        return cast(JSON_DICT, asdict(self))
+    def serialize(self) -> UserSchema:
+        return UserSchema(
+            username=self.username,
+            password_hash=self.password_hash,
+            security_groups=[sgrp for sgrp in self.security_groups],
+        )
 
     @classmethod
-    def deserialize(cls, data: JSON_DICT) -> User:
+    def deserialize(cls, data: UserSchema) -> User:
         return cls(
-            username=data["username"], # type: ignore[arg-type]
-            password_hash=data["password_hash"],# type: ignore[arg-type]
-            security_groups=[SGrp(sgrp) for sgrp in data["security_groups"]],# type: ignore[union-attr, arg-type]
+            username=data.username,
+            password_hash=data.password_hash,
+            security_groups=[SGrp(sgrp) for sgrp in data.security_groups],
         )
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, User):
+            return NotImplemented
+        return (self.username == value.username and
+                self.password_hash == value.password_hash and
+                self.security_groups == value.security_groups)
+
 
 
 

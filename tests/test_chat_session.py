@@ -1,82 +1,128 @@
 import tempfile
 import unittest
 from datetime import datetime, timezone
+import os
 
 from legalcodex.ai.chat.chat_context import ChatContext
 from legalcodex.ai.chat.chat_session import ChatSession
+from legalcodex.ai.chat import chat_behaviour
+
 from legalcodex.ai.engines.mock_engine import MockEngine
 from legalcodex.ai.message import Message
 from legalcodex.exceptions import LCValueError
+from legalcodex._user_access import User, UsersAccess
 
+
+MAX_MESSAGES = 10
+SYSTEM_PROMPT = "Test System prompt"
 
 class TestChatSession(unittest.TestCase):
 
-    def test_serialize_and_deserialize_roundtrip(self) -> None:
-        context = ChatContext(system_prompt="System prompt", max_messages=10)
-        context.append(engine=MockEngine(), message=Message.User("hello"))
+    def setUp(self) -> None:
+        super().setUp()
 
+        context = ChatContext(system_prompt=SYSTEM_PROMPT, max_messages=MAX_MESSAGES)
+        engine = MockEngine()
+        user  = UsersAccess.get_instance().find("test")
         created_at = datetime(2026, 2, 22, 10, 30, 0, tzinfo=timezone.utc)
-        session = ChatSession(
+
+        self.session = ChatSession(
+            uid="session-123",
             context=context,
-            username="alice",
-            engine_name="openai",
-            engine_parameters={"model": "gpt-4.1-mini", "temperature": 0.2},
+            user=user,
             created_at=created_at,
-        )
+            engine = engine)
 
-        data = session.serialize()
+        self.session.context.append(self.session.engine, Message.User("Hello"))
+
+
+    def test_serialize_and_deserialize_roundtrip(self) -> None:
+        data = self.session.serialize()
         reloaded = ChatSession.deserialize(data)
-
-        self.assertEqual(reloaded.username, "alice")
-        self.assertEqual(reloaded.engine_name, "openai")
-        self.assertEqual(reloaded.engine_parameters["model"], "gpt-4.1-mini")
-        self.assertEqual(reloaded.created_at, created_at)
-        self.assertEqual(reloaded.context, context)
-
-    def test_serialize_contains_chat_context_entry(self) -> None:
-        context = ChatContext(system_prompt="System prompt", max_messages=10)
-        session = ChatSession(
-            context=context,
-            username="anonymous",
-            engine_name="mock",
-            engine_parameters={"model": "mock-model"},
-        )
-
-        data = session.serialize()
-
-        self.assertIn("chat-context", data)
-        self.assertIn("created_at", data)
-        self.assertTrue(str(data["created_at"]).endswith("Z"))
+        self._compare(reloaded)
 
     def test_save_and_load_file(self) -> None:
-        context = ChatContext(system_prompt="System prompt", max_messages=10)
-        context.append(engine=MockEngine(), message=Message.User("question"))
 
-        session = ChatSession(
-            context=context,
-            username="anonymous",
-            engine_name="mock",
-            engine_parameters={"model": "mock-model"},
-        )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = f"{tmpdir}/session.json"
-            session.save(path)
-            loaded = ChatSession.load(path)
+        with tempfile.TemporaryDirectory(prefix="legalcodex_test_") as tmpdir:
+            path = os.path.join(tmpdir, "session.json")
+            self.session.save(path)
+            reloaded = ChatSession.load(path)
+        self._compare(reloaded)
 
-        self.assertEqual(loaded.username, session.username)
-        self.assertEqual(loaded.engine_name, session.engine_name)
-        self.assertEqual(loaded.context, session.context)
 
-    def test_deserialize_invalid_datetime_raises(self) -> None:
-        context = ChatContext(system_prompt="System prompt", max_messages=10)
-        payload = {
-            "username": "anonymous",
-            "engine_name": "mock",
-            "engine_parameters": {"model": "mock-model"},
-            "created_at": "not-a-date",
-            "chat-context": context.serialize(),
-        }
+    def _compare(self, reloaded: ChatSession) -> None:
+        self.assertEqual(reloaded._uid,         self.session._uid)
+        self.assertEqual(reloaded._user,        self.session._user)
+        self.assertEqual(reloaded.engine.name,  self.session.engine.name)
+        self.assertEqual(reloaded.engine.model, self.session.engine.model)
+        self.assertEqual(reloaded.context,      self.session.context)
+        self.assertEqual(reloaded._created_at,  self.session._created_at)
+
+
+    def test_receive_user_message_appends_turn_and_returns_response(self) -> None:
+
+        self.session.context.reset()
+
+        stream = chat_behaviour.send_message(self.session, "User0")
+        response :str = stream.all()
+
+        self.assertEqual("0", response)
+
+        history = list(self.session.context)
+
+
+        self.assertEqual(len(history), 3)
+
+        self.assertEqual(history[0].role, "system")
+        self.assertEqual(history[0].content, SYSTEM_PROMPT)
+
+        self.assertEqual(history[1].role, "user")
+        self.assertEqual(history[1].content, "User0")
+
+        self.assertEqual(history[2].role, "assistant")
+        self.assertEqual(history[2].content, "0")
+
+
+    def test_reset_keeps_only_system_message(self) -> None:
+
+        self.assertEqual(len(list(self.session.context)), 2)
+
+        self.session.context.reset()
+
+        self.assertEqual(len(list(self.session.context)), 1)
+        self.assertEqual(list(self.session.context)[0].role, "system")
+        self.assertEqual(list(self.session.context)[0].content, SYSTEM_PROMPT)
+
+    def test_rejects_empty_user_message(self) -> None:
+
 
         with self.assertRaises(LCValueError):
-            ChatSession.deserialize(payload)
+            chat_behaviour.send_message(self.session, "   ")
+
+    def test_max_turns_trims_history(self) -> None:
+
+        self.session.context.reset()
+
+
+        self.assertEqual(self.session.context._summary, "")
+
+        N = MAX_MESSAGES//2
+        for i in range(N):
+            chat_behaviour.send_message(self.session, str(i)).all()
+
+        self.assertEqual(self.session.engine.count, N)
+        self.assertEqual(len(list(self.session.context)), MAX_MESSAGES + 1) # N messages + system prompt
+
+
+
+        # After MAX turns, the history should be trimmed to MAX messages
+        chat_behaviour.send_message(self.session, "Extra message").all()
+
+        self.assertEqual(self.session.engine.count, N + 2) # one for the extra message, one for the summary generation
+
+        self.assertNotEqual(self.session.context._summary, "")
+
+
+
+

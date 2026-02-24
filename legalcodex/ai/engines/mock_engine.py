@@ -5,6 +5,7 @@ import logging
 from ..engine import Engine
 from ..context import Context
 from ..stream import Stream
+from ._models import DEFAULT_MODEL
 
 
 _logger = logging.getLogger(__name__)
@@ -13,9 +14,12 @@ class MockEngine(Engine):
     """
     A mock engine for testing purposes.
     """
-    NAME : Final[str]  = "mock"
+    NAME : str  = "mock"
 
     _count:int = 0
+
+    def __init__(self, model:str=DEFAULT_MODEL)->None:
+        super().__init__(model=model)
 
     @property
     def count(self)->int:
