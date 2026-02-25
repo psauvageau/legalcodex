@@ -31,6 +31,7 @@
 - Run server: `python -m legalcodex serve --host 127.0.0.1 --port 8000 --reload`
 - Tests: `pytest` (configured by `pytest.ini`, tests under `tests/`)
 - Type-checking: `mypy` (configured by `mypy.ini`)
+- Copilot skills: see `.github/skills/create_cli_command.md`, `.github/skills/create_tests.md`, `.github/skills/run_tests.md`.
 
 ## API Documentation & References
 - **Markdown API Reference:** `API_Documentation.md` — comprehensive guide covering authentication, all endpoints, request/response formats, code examples (Python/JavaScript/curl), error handling, and best practices. Use this for understanding the current API surface.
