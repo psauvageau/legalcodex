@@ -12,6 +12,7 @@ from ..ai.chat import chat_behaviour
 from ..ai.stream import Stream
 from ..exceptions import LCException
 from .._environ import LC_API_KEY
+from .. import serialization
 
 from .engine_cmd import EngineCommand
 
@@ -80,7 +81,7 @@ class CommandChat(EngineCommand):
     @contextmanager
     def get_session(self, args:argparse.Namespace)->Generator[ChatSession,None,None]:
         if os.path.isfile(FILE_NAME):
-            session = ChatSession.load(FILE_NAME)
+            session = serialization.load(ChatSession, FILE_NAME)
         else:
             session = ChatSession.new_chat_session(
                     username="test",
@@ -93,7 +94,7 @@ class CommandChat(EngineCommand):
         try:
             yield session
         finally:
-            session.save(FILE_NAME)
+            serialization.save(session, FILE_NAME)
 
 
 def write(msg:str)->None:

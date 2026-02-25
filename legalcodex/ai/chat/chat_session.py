@@ -3,28 +3,21 @@ Chat session persistence model.
 """
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import TypeVar, Type, Optional, Any, Final
 from uuid import uuid4
 
-
-
-from ..._types import JSON_DICT
 from ...exceptions import LCValueError
 from ..._user_access import User, UsersAccess
 from ..._misc import serialize_datetime, parse_datetime
-from ..._schema import ChatSessionSchema, EngineSchema
+from ..._schema import ChatSessionSchema
 
 from ..engine import Engine
 from .._engine_selector import ENGINES, DEFAULT_ENGINE
 from ..engines._models import MODELS, DEFAULT_MODEL
 
-
-
 from .chat_context import ChatContext
-
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +27,10 @@ class ChatSession:
     """
     Represents a persisted chat session with context and engine metadata.
     """
+
+    SCHEMA = ChatSessionSchema
+
+
     _uid : Final[str]
     _context: ChatContext
     _user : User
@@ -115,19 +112,7 @@ class ChatSession:
             engine=engine
         )
 
-    def save(self, filename: str) -> None:
-        _logger.info("Saving chat session to file: %s", filename)
-        content = self.serialize().model_dump()
-        as_str = json.dumps(content, indent=2)
-        with open(filename, "w", encoding="utf-8") as file_handle:
-            file_handle.write(as_str)
 
-    @classmethod
-    def load(cls: type[T], filename: str) -> T:
-        with open(filename, "r", encoding="utf-8") as file_handle:
-            data = json.load(file_handle)
-        cs = ChatSessionSchema.model_validate(data)
-        return cls.deserialize(cs)
 
 def _get_engine(name:Optional[str],
                 model:Optional[str])->Engine:

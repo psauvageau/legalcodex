@@ -11,6 +11,7 @@ from legalcodex.ai.engines.mock_engine import MockEngine
 from legalcodex.ai.message import Message
 from legalcodex.exceptions import LCValueError
 from legalcodex._user_access import User, UsersAccess
+from legalcodex import serialization
 
 
 MAX_MESSAGES = 10
@@ -46,8 +47,8 @@ class TestChatSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="legalcodex_test_") as tmpdir:
             path = os.path.join(tmpdir, "session.json")
-            self.session.save(path)
-            reloaded = ChatSession.load(path)
+            serialization.save(self.session, path)
+            reloaded = serialization.load(ChatSession, path)
         self._compare(reloaded)
 
 
