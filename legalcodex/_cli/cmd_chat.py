@@ -81,7 +81,7 @@ class CommandChat(EngineCommand):
     @contextmanager
     def get_session(self, args:argparse.Namespace)->Generator[ChatSession,None,None]:
         if os.path.isfile(FILE_NAME):
-            session = serialization.load(ChatSession, FILE_NAME)
+            session = ChatSession.load(FILE_NAME)
         else:
             session = ChatSession.new_chat_session(
                     username="test",
@@ -94,20 +94,12 @@ class CommandChat(EngineCommand):
         try:
             yield session
         finally:
-            serialization.save(session, FILE_NAME)
-
+            session.save(FILE_NAME)
 
 def write(msg:str)->None:
     _logger.info(msg)
     print(msg)
     print()
-
-
-
-
-
-
-
 
 
 class ChatCommands:

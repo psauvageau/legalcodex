@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import TypeVar, Type, Optional, Any, Final
 from uuid import uuid4
 
+from ...serialization import Serializable
 from ...exceptions import LCValueError
 from ..._user_access import User, UsersAccess
 from ..._misc import serialize_datetime, parse_datetime
@@ -23,7 +24,7 @@ _logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound="ChatSession")
 
-class ChatSession:
+class ChatSession(Serializable[ChatSessionSchema]):
     """
     Represents a persisted chat session with context and engine metadata.
     """
