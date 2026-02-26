@@ -7,12 +7,13 @@ import os
 from contextlib import closing, contextmanager
 from typing import Optional, Generator
 
-from ..ai.chat.chat_session import ChatSession
+from ..ai.chat.chat_session import ChatSession, ChatSessionId
+from ..ai.chat.chat_session_manager import ChatSessionManager
 from ..ai.chat import chat_behaviour
 from ..ai.stream import Stream
 from ..exceptions import LCException
-from .._environ import LC_API_KEY
-from .. import serialization
+
+
 
 from .engine_cmd import EngineCommand
 
@@ -53,8 +54,8 @@ class CommandChat(EngineCommand):
     def run(self, args: argparse.Namespace) -> None:
         self.set_api_key()
 
-        with self.get_session(args) as session:
-            commands = ChatCommands(session)
+        with get_session(args) as session_id:
+            commands = ChatCommands(session_id)
             write("Starting interactive chat session. Type 'help' for commands.")
             while True:
                 try:
@@ -64,9 +65,11 @@ class CommandChat(EngineCommand):
                         continue
 
                     commands.execute(prompt)
+                    session = ChatSessionManager().get_session(session_id)
 
                     stream :Stream = chat_behaviour.send_message(session, prompt)
                     self.stream_handler(stream)
+                    print()
 
                 except CommandExecutedException:
                     continue
@@ -78,23 +81,25 @@ class CommandChat(EngineCommand):
                         write("Exiting chat session.")
                         break
 
-    @contextmanager
-    def get_session(self, args:argparse.Namespace)->Generator[ChatSession,None,None]:
-        if os.path.isfile(FILE_NAME):
-            session = ChatSession.load(FILE_NAME)
-        else:
-            session = ChatSession.new_chat_session(
-                    username="test",
-                    system_prompt=args.system,
-                    max_messages=args.max_turns,
-                    engine_name=args.engine,
-                    model=args.model,
-                    trim_length=0
-                )
-        try:
-            yield session
-        finally:
-            session.save(FILE_NAME)
+@contextmanager
+def get_session(args:argparse.Namespace)->Generator[ChatSessionId,None,None]:
+    if os.path.isfile(FILE_NAME):
+        session = ChatSession.load(FILE_NAME)
+    else:
+        session = ChatSession.new_chat_session(
+                username="test",
+                system_prompt=args.system,
+                max_messages=args.max_turns,
+                engine_name=args.engine,
+                model=args.model,
+                trim_length=0
+            )
+
+    ChatSessionManager().add_session(session)
+    try:
+        yield session.uid
+    finally:
+        session.save(FILE_NAME)
 
 def write(msg:str)->None:
     _logger.info(msg)
@@ -106,8 +111,10 @@ class ChatCommands:
     """
     A wrapper for chat-related commands, providing common utilities and shared state.
     """
-    def __init__(self, chat:ChatSession)->None:
+    def __init__(self, chat:ChatSessionId)->None:
         self._chat = chat
+
+
 
         def exit()->None:
             raise ExitException()
@@ -117,7 +124,10 @@ class ChatCommands:
             write(f"Commands: {cmds}")
 
         def history()->None:
-            messages = self._chat.context.get_messages()
+
+            session = ChatSessionManager().get_session(self._chat)
+            messages = self.chat_session.context.get_messages()
+
             for msg in messages:
                 write(f"{msg.role}: {msg.content}")
 
@@ -125,8 +135,12 @@ class ChatCommands:
                                 "quit": exit,
                                 "help": help,
                                 "history": history,
-                                "reset": self._chat.context.reset,
+                                "reset": self.chat_session.context.reset,
                 }
+
+    @property
+    def chat_session(self) -> ChatSession:
+        return ChatSessionManager().get_session(self._chat)
 
     def execute(self, prompt:str)->None:
         command = prompt.lower()

@@ -53,7 +53,7 @@ class TestChatSession(unittest.TestCase):
 
 
     def _compare(self, reloaded: ChatSession) -> None:
-        self.assertEqual(reloaded._uid,         self.session._uid)
+        self.assertEqual(reloaded.uid,         self.session.uid)
         self.assertEqual(reloaded._user,        self.session._user)
         self.assertEqual(reloaded.engine.name,  self.session.engine.name)
         self.assertEqual(reloaded.engine.model, self.session.engine.model)

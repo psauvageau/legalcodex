@@ -35,6 +35,7 @@ class ChatContext(BaseContext):
 
     _history: list[Message]         # The main conversation history, excluding the system prompt and summary
     _summary: str                   # A summary of the messages that were removed from the history due to trimming
+    _is_dirty: bool                 # Indicates if the context has unsaved changes
 
     def __init__(self,  system_prompt: str,
                         max_messages: int,
@@ -52,6 +53,11 @@ class ChatContext(BaseContext):
 
         self._history = history or []
         self._summary = summary or ""
+        self._is_dirty = False
+
+    @property
+    def dirty(self) -> bool:
+        return self._is_dirty
 
     def reset(self)-> None:
         """
@@ -59,6 +65,7 @@ class ChatContext(BaseContext):
         """
         self._history = []
         self._summary = ""
+        self._is_dirty = True
 
 
     def get_messages(self) -> Iterable[Message]:
@@ -78,6 +85,7 @@ class ChatContext(BaseContext):
         """
         _logger.debug("Appending message to history: %s", message)
         self._history.append(message)
+        self._is_dirty = True
 
         if len(self._history) > self._max_messages:
             self._trim(engine)
@@ -128,6 +136,7 @@ class ChatContext(BaseContext):
 
             self._history = keep
             self._summary = new_summary if new_summary else self._summary
+            self._is_dirty = True
 
 
 
@@ -136,6 +145,11 @@ class ChatContext(BaseContext):
             _logger.exception(err)
             _logger.warning("Trimming History without summarization. This may lead to loss of important context.")
             self._history = self._history[self._trim_length:]
+            self._is_dirty = True
+
+    def clear_dirty(self) -> None:
+        """Mark the context as clean after persisting changes."""
+        self._is_dirty = False
 
 
     def __eq__(self, other: object) -> bool:

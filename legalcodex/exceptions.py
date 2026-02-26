@@ -34,3 +34,8 @@ class UserNotFound(LCException):
     """Exception raised when a user is not found."""
     def __init__(self, username: str) -> None:
         super().__init__(f"User '{username}' not found")
+
+class ChatSessionNotFound(LCException):
+    """Exception raised when a chat session is not found."""
+    def __init__(self, session_id: str) -> None:
+        super().__init__(f"Chat session with id '{session_id}' not found")

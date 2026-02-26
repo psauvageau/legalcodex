@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import TypeVar, Type, Optional, Any, Final
+from typing import TypeVar, Type, Optional, Any, Final, NewType, cast
 from uuid import uuid4
 
 from ...serialization import Serializable
@@ -22,36 +22,37 @@ from .chat_context import ChatContext
 
 _logger = logging.getLogger(__name__)
 
+
+ChatSessionId = NewType("ChatSessionId", str)
+
+
 T = TypeVar("T", bound="ChatSession")
 
 class ChatSession(Serializable[ChatSessionSchema]):
     """
     Represents a persisted chat session with context and engine metadata.
     """
-
     SCHEMA = ChatSessionSchema
 
-
-    _uid : Final[str]
-    _context: ChatContext
-    _user : User
-    _created_at: datetime
-    _engine: Engine
+    uid         : Final[ChatSessionId]
+    _context    : ChatContext
+    _user       : Final[User]
+    _created_at : Final[datetime]
+    _engine     : Final[Engine]
 
     def __init__(
         self,
-        uid: str,
+        uid: ChatSessionId,
         context: ChatContext,
         user : User,
         created_at :datetime,
         engine: Engine )->None:
 
-        self._uid = uid
+        self.uid = uid
         self._context = context
         self._user = user
         self._created_at = created_at
         self._engine = engine
-
 
     @property
     def engine(self)->Engine:
@@ -65,12 +66,21 @@ class ChatSession(Serializable[ChatSessionSchema]):
     def username(self) -> str:
         return self._user.username
 
+    @property
+    def dirty(self) -> bool:
+        return self._context.dirty
 
+    def save(self, filename: str) -> None:
+        """
+        Save a Serializable object to a JSON file.
+        """
+        super().save(filename)
+        self._context.clear_dirty()
 
     def serialize(self) -> ChatSessionSchema:
         data = ChatSessionSchema(
-            uid=         self._uid,
-            username=    self._user.username,
+            uid=         self.uid,
+            username=    self.username,
             created_at = serialize_datetime(self._created_at),
             context = self._context.serialize(),
             engine=self._engine.serialize()
@@ -85,7 +95,7 @@ class ChatSession(Serializable[ChatSessionSchema]):
         created_at   = parse_datetime(data.created_at)
         engine       = Engine.deserialize(data.engine)
 
-        return cls(uid = data.uid,
+        return cls(uid = cast(ChatSessionId, data.uid),
                    user=user,
                    context=context,
                    created_at=created_at,
@@ -106,7 +116,7 @@ class ChatSession(Serializable[ChatSessionSchema]):
         engine = _get_engine(engine_name, model)
 
         return cls(
-            uid=str(uuid4()),
+            uid=_new_session_id(),
             user=user,
             context=context,
             created_at=created_at,
@@ -131,3 +141,5 @@ def _get_engine(name:Optional[str],
     return engine_cls(model=model)
 
 
+def _new_session_id() -> ChatSessionId:
+    return cast(ChatSessionId, str(uuid4()))
