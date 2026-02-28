@@ -1,25 +1,32 @@
 import argparse
 import logging
-from typing import List, Type, Iterable, Optional, Generator
+from typing import List, Type, Iterable, Optional, Generator, Final
 from contextlib import contextmanager
 from contextlib import contextmanager
 
-from .exceptions import LCException
+
 
 from ._cli.cli_cmd import CliCmd
 from ._cli.cmd_chat import CommandChat
+from ._cli.cmd_serve import CommandServe
 from ._cli.cmd_test import CommandTest
 
-from ._cli._log_window import log_window
+
+
+from .exceptions import LCException
+from ._logs import init_log
 
 
 COMMANDS :List[Type[CliCmd]] = [
     CommandChat,
+    CommandServe,
     CommandTest,
     # Add new command classes here
 ]
 
 _logger = logging.getLogger(__name__)
+
+MEGABYTES :Final[int] = 1024 * 1024
 
 
 def main()->None:
@@ -32,13 +39,16 @@ def main()->None:
     if args.command:        # Execute the command
         try:
             with init_log(args.verbose, args.log_window):
+                _logger.info("Starting LegalCodex")
                 args.command.run(args)
+                _logger.info("LegalCodex finished successfully")
         except LCException as e:
             logging.error("Error: %s", e)
             exit(1)
     else:
         print(f"No command specified. [{", ".join([cmd.title for cmd in COMMANDS])}]")
         exit(1)
+
 
 
 def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
@@ -65,48 +75,6 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
 
     return parser.parse_args()
 
-@contextmanager
-def init_log(verbose:bool, enable_log_window: bool)->Generator[None, None, None]:
-    """
-    Initialize the logging configuration.
-
-    Args:
-        verbose (bool): If True, set logging level to DEBUG, otherwise INFO.
-    """
-    level = logging.DEBUG if verbose else logging.INFO
-
-    format = "%(levelname)-8s - %(name)-20s - %(message)s"
-
-    #logging.basicConfig(level=level, format=format)
-
-
-
-    silence = ["httpx",
-               "openai._base_client",
-               "google_genai.models",
-               "httpcore"]
-
-    for name in silence:
-        logging.getLogger(name).setLevel(logging.WARNING)
-
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-
-    if enable_log_window:
-        with log_window():
-            yield
-            input("Press Enter to exit...")
-    else:
-        handler = logging.StreamHandler()
-        handler.setLevel(level)
-        handler.setFormatter(logging.Formatter(format))
-        root_logger.addHandler(handler)
-        try:
-            logging.getLogger().info("Logging initialized. Level: %s", logging.getLevelName(level))
-            yield
-        finally:
-            logging.getLogger().removeHandler(handler)
 
 if __name__ == "__main__":
     main()

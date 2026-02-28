@@ -18,6 +18,9 @@ Build a conversational legal assistant that can search a large document library 
 - Add a `chat` command (interactive loop)
 - Support multi-turn conversation history
 - Add commands like `exit`, `reset`, `help`
+- Detailed implementation plans:
+	- [Milestone 1 — Interactive Chat Command + Conversation State](milestone-1-plan.md)
+	- [Chat App Notes](chat_app.md)
 
 ### B. Document Ingestion
 - Create loader interfaces and concrete loaders by file type
@@ -45,16 +48,36 @@ Build a conversational legal assistant that can search a large document library 
 - Small evaluation set (questions + expected references)
 - Basic regression checks for citation presence and relevance
 
+### G. Remote API & Deployment
+- Expose chat behavior through a remote REST API
+- Add status endpoint and service health checks
+- Deploy publicly over HTTPS using managed PaaS
+- Detailed implementation plans:
+	- [Milestone C — Remote Chat API](milestone-c-remote-chat-api.md)
+	- [Milestone D — FastAPI Status-Only Server](milestone-d-fastapi-status-server.md)
+	- [Milestone D — PaaS Deployment](milestone-d-paas-deployment.md)
+
 ## 4) Suggested Milestones
 - **Milestone 1:** Interactive chat command + conversation state
 - **Milestone 2:** Ingestion/chunking + baseline lexical retrieval
 - **Milestone 3:** Grounded answer generation with citations
 - **Milestone 4:** Semantic retrieval + hybrid ranking improvements
-- **Milestone 5:** Evaluation harness and hardening
+- **Milestone 5:** Remote chat API exposure and session lifecycle
+- **Milestone 6:** FastAPI status server baseline and health contract
+- **Milestone 7:** SaaS deployment over managed HTTPS
+- **Milestone 8:** Evaluation harness and hardening
 
 ## 5) Immediate Next Tasks
-1. Create command scaffold for `chat` in `legalcodex/_cli/` and register it in `__main__.py`.
-2. Define document loader interface in `legalcodex/loaders/` and implement a first loader (`.md` / `.txt`).
-3. Add chunking utility and chunk metadata model.
-4. Implement a first retrieval module (keyword-based) for MVP grounding.
-5. Update README with current architecture, setup, and usage examples.
+1. Consolidate milestone status across the detailed plan documents listed above.
+2. Keep retrieval/citation milestones aligned with API and deployment sequencing.
+3. Ensure dependencies and packaging reflect server/runtime milestones.
+4. Update README with both CLI and remote API/server usage paths.
+5. Maintain one source of truth for security/deployment requirements in planning docs.
+
+## 6) Detailed Planning Documents (Current)
+- [Milestone 1 — Interactive Chat Command + Conversation State](milestone-1-plan.md)
+- [Milestone B — Document Ingestion](milestone-b-document-ingestion.md)
+- [Milestone C — Remote Chat API](milestone-c-remote-chat-api.md)
+- [Milestone D — FastAPI Status-Only Server](milestone-d-fastapi-status-server.md)
+- [Milestone D — PaaS Deployment](milestone-d-paas-deployment.md)
+- [Chat App Notes](chat_app.md)
