@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import os
 
 from legalcodex.ai.chat.chat_context import ChatContext
-from legalcodex.ai.chat.chat_session import ChatSession
+from legalcodex.ai.chat.chat_session import ChatSession, ChatSessionId
 from legalcodex.ai.chat import chat_behaviour
 
 from legalcodex.ai.engines.mock_engine import MockEngine
@@ -28,13 +28,14 @@ class TestChatSession(unittest.TestCase):
         created_at = datetime(2026, 2, 22, 10, 30, 0, tzinfo=timezone.utc)
 
         self.session = ChatSession(
-            uid="session-123",
+            uid=ChatSessionId("session-123"),
             context=context,
             user=user,
             created_at=created_at,
             engine = engine)
 
         self.session.context.append(self.session.engine, Message.User("Hello"))
+        self._mock_engine = engine
 
 
     def test_serialize_and_deserialize_roundtrip(self) -> None:
@@ -112,7 +113,7 @@ class TestChatSession(unittest.TestCase):
         for i in range(N):
             chat_behaviour.send_message(self.session, str(i)).all()
 
-        self.assertEqual(self.session.engine.count, N)
+        self.assertEqual(self._mock_engine.count, N)
         self.assertEqual(len(list(self.session.context)), MAX_MESSAGES + 1) # N messages + system prompt
 
 
@@ -120,7 +121,7 @@ class TestChatSession(unittest.TestCase):
         # After MAX turns, the history should be trimmed to MAX messages
         chat_behaviour.send_message(self.session, "Extra message").all()
 
-        self.assertEqual(self.session.engine.count, N + 2) # one for the extra message, one for the summary generation
+        self.assertEqual(self._mock_engine.count, N + 2) # one for the extra message, one for the summary generation
 
         self.assertNotEqual(self.session.context._summary, "")
 

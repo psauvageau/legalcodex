@@ -1,23 +1,24 @@
 """Thread-safe singleton manager for chat sessions."""
-
+from __future__ import annotations
 import logging
 import threading
-from typing import Dict
+from typing import Dict, cast
 
 
 from ...exceptions import ChatSessionNotFound
 from ..._singleton import Singleton
+from ...serialization import Serializable
+from ..._schema import ChatSessionManagerSchema
 from .chat_session import ChatSession, ChatSessionId
 
 _logger = logging.getLogger(__name__)
 
 
-class ChatSessionManager(Singleton):
+class ChatSessionManager(Singleton, Serializable[ChatSessionManagerSchema]):
     """Maintains chat sessions keyed by session id in a thread-safe map."""
 
+    SCHEMA = ChatSessionManagerSchema
     _sessions: Dict[ChatSessionId, ChatSession]
-
-
 
     def __init__(self) -> None:
         self._sessions = {}
@@ -40,3 +41,18 @@ class ChatSessionManager(Singleton):
         if session is None:
             raise ChatSessionNotFound(session_id)
         return session
+
+    def serialize(self) -> ChatSessionManagerSchema:
+        """Serialize all chat sessions keyed by id."""
+        with self._lock:
+            data = [ session.serialize() for session in self._sessions.values()]
+        return self.SCHEMA(sessions=data)
+
+    @classmethod
+    def deserialize(cls, data: ChatSessionManagerSchema) -> ChatSessionManager:
+        instance = cls()
+        with instance._lock:
+            assert len(instance._sessions) == 0, "Deserialization should only be called on a new instance"
+            sessions = [ ChatSession.deserialize(session_data) for session_data in data.sessions]
+            instance._sessions = { session.uid: session for session in sessions }
+        return instance

@@ -75,7 +75,7 @@ class TestAuthRoutes(unittest.TestCase):
         cookie_value = response.cookies.get("lc_access")
         self.assertIsNotNone(cookie_value)
         # JWT tokens have 3 parts separated by dots
-        self.assertEqual(cookie_value.count("."), 2)
+        self.assertEqual(cookie_value.count("."), 2) # type: ignore[union-attr]
 
     def test_login_failure_returns_unauthorized(self) -> None:
         response = self.client.post(

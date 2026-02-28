@@ -51,3 +51,12 @@ class ChatSessionSchema(BaseModel):
 
     class Config:
         extra = "forbid"
+
+
+class ChatSessionManagerSchema(BaseModel):
+    """Serialization schema for a collection of chat sessions keyed by id."""
+
+    sessions: list[ChatSessionSchema]
+
+    class Config:
+        extra = "forbid"

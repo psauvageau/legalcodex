@@ -2,9 +2,10 @@
 
 import threading
 from typing import Any, Dict
+from abc import ABCMeta
 
 
-class SingletonMeta(type):
+class SingletonMeta(ABCMeta):
     """Thread-safe singleton metaclass."""
 
     _instances: Dict[type, Any] = {}
