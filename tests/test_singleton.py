@@ -1,6 +1,6 @@
 import unittest
 
-from legalcodex._singleton import Singleton, SingletonMeta
+from legalcodex._singleton import Singleton
 
 
 class SampleSingleton(Singleton):
@@ -12,7 +12,8 @@ class SampleSingleton(Singleton):
 class TestSingleton(unittest.TestCase):
     def tearDown(self) -> None:
         # Clear the cached instance to avoid leaking state across tests.
-        SingletonMeta._instances.pop(SampleSingleton, None)
+        Singleton._instances.pop(SampleSingleton, None)
+        assert len(Singleton._instances) == 0, "Singleton instances should be cleared after each test"
 
     def test_repeated_instantiation_returns_same_object(self) -> None:
         first = SampleSingleton()

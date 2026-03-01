@@ -8,6 +8,8 @@ from contextlib import contextmanager
 
 from datetime import datetime, timezone
 
+from ._environ import LC_ROOT_PATH
+
 
 
 
@@ -38,3 +40,12 @@ def parse_datetime(raw: str) -> datetime:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
+
+
+
+def get_root_path()->str:
+    root = os.environ.get(LC_ROOT_PATH, None)
+    if root is None:
+        return os.getcwd()
+    else:
+        return root

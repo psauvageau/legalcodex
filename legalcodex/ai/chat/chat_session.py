@@ -116,13 +116,16 @@ class ChatSession(Serializable[ChatSessionSchema]):
         engine = _get_engine(engine_name, model)
 
         return cls(
-            uid=_new_session_id(),
+            uid=cls._new_session_id(),
             user=user,
             context=context,
             created_at=created_at,
             engine=engine
         )
 
+    @classmethod
+    def _new_session_id(cls) -> ChatSessionId:
+        return cast(ChatSessionId, str(uuid4()))
 
 
 def _get_engine(name:Optional[str],
@@ -141,5 +144,3 @@ def _get_engine(name:Optional[str],
     return engine_cls(model=model)
 
 
-def _new_session_id() -> ChatSessionId:
-    return cast(ChatSessionId, str(uuid4()))

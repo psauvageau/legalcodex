@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 _logger = logging.getLogger(__name__)
 
 from .._logs import get_log_file_handler, silence_loggers
-from .._environ import LC_FRONTEND_PATH
+from .._misc import get_root_path
 
 
 def create_app() -> FastAPI:
@@ -31,13 +31,13 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def get_frontend_index() -> FileResponse:
-        index_path = get_frontend_path() / "index.html"
+        index_path = _get_frontend_path() / "index.html"
         _logger.debug("Serving frontend index from: %s", index_path)
         return FileResponse(index_path, media_type="text/html")
 
     app.include_router(status_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
-    app.mount("/", StaticFiles(directory=get_frontend_path()), name="frontend")
+    app.mount("/", StaticFiles(directory=_get_frontend_path()), name="frontend")
     return app
 
 
@@ -59,14 +59,9 @@ def _init_log(verbose:bool=False)->None:
     silence_loggers()
 
 
-
-def get_frontend_path() -> Path:
-    env_path = os.environ.get(LC_FRONTEND_PATH)
-    if env_path:
-        path =  Path(env_path)
-    else:
-        path = Path.cwd() / "frontend"
-
+def _get_frontend_path() -> Path:
+    root_path = Path(get_root_path())
+    path = root_path / "frontend"
     if not path.exists():
         _logger.warning("Frontend path does not exist: %s", path)
     return path

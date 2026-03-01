@@ -5,15 +5,13 @@ import argparse
 import json
 import os
 from contextlib import closing, contextmanager
-from typing import Optional, Generator
+from typing import Optional, Generator, Final, cast, Any
 
 from ..ai.chat.chat_session import ChatSession, ChatSessionId
 from ..ai.chat.chat_session_manager import ChatSessionManager
 from ..ai.chat import chat_behaviour
 from ..ai.stream import Stream
-from ..exceptions import LCException
-
-
+from ..exceptions import LCException, ChatSessionNotFound
 
 from .engine_cmd import EngineCommand
 
@@ -24,8 +22,8 @@ _logger = logging.getLogger(__name__)
 DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 DEFAULT_MAX_TURN = 40
 
+CLI_SESSION_ID :Final[ChatSessionId] = ChatSessionId("cli-session")
 
-FILE_NAME = "chat_session.json"
 
 class CommandChat(EngineCommand):
     title: str = "chat"
@@ -53,10 +51,11 @@ class CommandChat(EngineCommand):
 
     def run(self, args: argparse.Namespace) -> None:
         self.set_api_key()
-
-        with get_session(args) as session_id:
-            commands = ChatCommands(session_id)
-            write("Starting interactive chat session. Type 'help' for commands.")
+        cm = ChatSessionManager()
+        session = get_session(args)
+        commands_processor = ChatCommandProcessor(session.uid)
+        write("Starting interactive chat session. Type 'help' for commands.")
+        try:
             while True:
                 try:
                     prompt = input("You> ").strip()
@@ -64,9 +63,7 @@ class CommandChat(EngineCommand):
                         write("Please enter a message or type 'help'.")
                         continue
 
-                    commands.execute(prompt)
-                    session = ChatSessionManager().get_session(session_id)
-
+                    commands_processor.execute(prompt)
                     stream :Stream = chat_behaviour.send_message(session, prompt)
                     self.stream_handler(stream)
                     print()
@@ -80,41 +77,59 @@ class CommandChat(EngineCommand):
                 except (KeyboardInterrupt, ExitException):
                         write("Exiting chat session.")
                         break
+        finally:
+            cm.save()
 
-@contextmanager
-def get_session(args:argparse.Namespace)->Generator[ChatSessionId,None,None]:
-    if os.path.isfile(FILE_NAME):
-        session = ChatSession.load(FILE_NAME)
-    else:
-        session = ChatSession.new_chat_session(
-                username="test",
-                system_prompt=args.system,
-                max_messages=args.max_turns,
-                engine_name=args.engine,
-                model=args.model,
-                trim_length=0
-            )
 
-    ChatSessionManager().add_session(session)
+def get_session(args:argparse.Namespace)->ChatSession:
+
+    manager = ChatSessionManager()
     try:
-        yield session.uid
-    finally:
-        session.save(FILE_NAME)
+        session = manager.get_session(CLI_SESSION_ID)
+
+        return session
+
+    except ChatSessionNotFound:
+        pass
+
+    session = _CliChatSession.new_chat_session(
+            username="test",
+            system_prompt=args.system,
+            max_messages=args.max_turns,
+            engine_name=args.engine,
+            model=args.model,
+            trim_length=0
+        )
+    ChatSessionManager().add_session(session)
+    if session.uid != CLI_SESSION_ID:
+        raise LCException("CLI session should have a fixed session id")
+
+    return session
 
 def write(msg:str)->None:
     _logger.info(msg)
     print(msg)
     print()
 
+class _CliChatSession(ChatSession):
+    """
+    A wrapper around ChatSession that automatically saves after each message.
+    """
 
-class ChatCommands:
+    @classmethod
+    def _new_session_id(cls) -> ChatSessionId:
+        return CLI_SESSION_ID
+
+
+
+class ChatCommandProcessor:
     """
     A wrapper for chat-related commands, providing common utilities and shared state.
     """
+    _session_id : Final[ChatSessionId]
+
     def __init__(self, chat:ChatSessionId)->None:
-        self._chat = chat
-
-
+        self._session_id = chat
 
         def exit()->None:
             raise ExitException()
@@ -124,8 +139,6 @@ class ChatCommands:
             write(f"Commands: {cmds}")
 
         def history()->None:
-
-            session = ChatSessionManager().get_session(self._chat)
             messages = self.chat_session.context.get_messages()
 
             for msg in messages:
@@ -140,7 +153,10 @@ class ChatCommands:
 
     @property
     def chat_session(self) -> ChatSession:
-        return ChatSessionManager().get_session(self._chat)
+        cm = ChatSessionManager()
+
+        session = cm.get_session(self._session_id)
+        return session
 
     def execute(self, prompt:str)->None:
         command = prompt.lower()

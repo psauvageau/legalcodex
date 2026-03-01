@@ -11,9 +11,9 @@
 htmlcov/
 build/
 
-
-api_key.json
 config.json
-chat_session.json
+
 legalcodex.log
 lc_server.log
+
+.chat_sessions/
