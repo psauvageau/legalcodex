@@ -11,22 +11,22 @@ The LegalCodex HTTP API provides programmatic access to legal document processin
 
 ## Authentication
 
-The API uses cookie-based session authentication with HTTP-only cookies. All protected endpoints require a valid `lc_access` session cookie.
+The API uses cookie-based authentication with an HTTP-only JWT stored in the `lc_access` cookie. All protected endpoints require a valid `lc_access` cookie.
 
 ### Authentication Flow
 
 1. **Login:** Submit credentials via `POST /api/v1/auth/login`
-2. **Session established:** Server sets an `lc_access` HTTP-only cookie with path `/api/v1`
+2. **Session established:** Server sets an `lc_access` HTTP-only cookie (JWT) with path `/api/v1`
 3. **Access protected resources:** Include the cookie in subsequent requests (automatic in browsers; explicit in API clients)
 4. **Logout:** Call `POST /api/v1/auth/logout` to clear the session cookie
 
 ### Cookie Details
 
 - **Name:** `lc_access`
-- **Value:** `GRANTED` (on successful authentication)
+- **Value:** JWT token (encodes username + roles)
 - **Flags:** `HttpOnly`, `SameSite=lax`
 - **Path:** `/api/v1`
-- **Max-Age:** Session-based (cleared on logout)
+- **Max-Age:** 30 minutes by default (rolling expiry via re-login)
 
 ---
 
@@ -156,7 +156,9 @@ GET /api/v1/auth/session
 - **Body:**
   ```json
   {
-    "authenticated": true
+    "authenticated": true,
+    "username": "string",
+    "roles": ["string", "..."]
   }
   ```
 
@@ -358,7 +360,9 @@ Close a chat session and remove its persisted data.
 
 ```json
 {
-  "authenticated": "boolean"
+  "authenticated": "boolean",
+  "username": "string (present when authenticated)",
+  "roles": ["string", "..."]
 }
 ```
 
