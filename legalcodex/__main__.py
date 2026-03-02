@@ -8,6 +8,7 @@ from contextlib import contextmanager
 
 from ._cli.cli_cmd import CliCmd
 from ._cli.cmd_chat import CommandChat
+from ._cli.cmd_chat_remote import CommandChatRemote
 from ._cli.cmd_serve import CommandServe
 from ._cli.cmd_test import CommandTest
 
@@ -19,6 +20,7 @@ from ._logs import init_log
 
 COMMANDS :List[Type[CliCmd]] = [
     CommandChat,
+    CommandChatRemote,
     CommandServe,
     CommandTest,
     # Add new command classes here

@@ -8,8 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-
-
+from .routes import auth, status, chat
 
 _logger = logging.getLogger(__name__)
 
@@ -18,9 +17,6 @@ from .._misc import get_root_path
 
 
 def create_app() -> FastAPI:
-
-    from legalcodex.http_server.routes.status import router as status_router
-    from legalcodex.http_server.routes.auth import router as auth_router
 
     _init_log(verbose=False)
     _configure_static_mime_types()
@@ -35,8 +31,9 @@ def create_app() -> FastAPI:
         _logger.debug("Serving frontend index from: %s", index_path)
         return FileResponse(index_path, media_type="text/html")
 
-    app.include_router(status_router, prefix="/api/v1")
-    app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(status.router, prefix="/api/v1")
+    app.include_router(chat.router, prefix="/api/v1")
     app.mount("/", StaticFiles(directory=_get_frontend_path()), name="frontend")
     return app
 

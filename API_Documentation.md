@@ -237,6 +237,112 @@ console.log('Timestamp:', data.timestamp_utc);
 
 ---
 
+### Chat Routes
+
+All chat routes require an authenticated session (cookie `lc_access`). Base path: `/api/v1/chat`.
+
+#### GET `/api/v1/chat/sessions`
+
+List available chat sessions.
+
+**Response**
+
+- **Status:** `200 OK`
+- **Body:**
+  ```json
+  [
+    {
+      "session_id": "string",
+      "description": "string or null"
+    }
+  ]
+  ```
+
+#### POST `/api/v1/chat/sessions`
+
+Open an existing session or create a new one.
+
+**Request**
+
+```http
+POST /api/v1/chat/sessions
+Content-Type: application/json
+
+{
+  "session_id": "string | null",  // optional: if provided, opens existing
+  "engine": "string | null",      // optional: engine name when creating
+  "model": "string | null",       // optional: model name when creating
+  "max_messages": 20               // optional: max messages when creating
+}
+```
+
+**Response**
+
+- **Status:** `201 Created` when a new session is created; `200 OK` when opening an existing session
+- **Body:**
+  ```json
+  {
+    "session_id": "string",
+    "description": "string or null"
+  }
+  ```
+
+**Errors**
+
+- `404 Not Found` if `session_id` is supplied but does not exist
+- `400 Bad Request` for validation or other chat errors
+
+#### GET `/api/v1/chat/sessions/{session_id}/context`
+
+Fetch the current chat context for a session.
+
+- **Status:** `200 OK`
+- **Body:** Full serialized chat session (includes `uid`, `username`, `created_at`, and `context` with system prompt, history, and summary fields).
+- **Errors:** `404 Not Found` if the session does not exist.
+
+#### POST `/api/v1/chat/sessions/{session_id}/messages`
+
+Send a user message and receive the assistant response.
+
+**Request**
+
+```http
+POST /api/v1/chat/sessions/{session_id}/messages
+Content-Type: application/json
+
+{
+  "message": "string"
+}
+```
+
+**Response**
+
+- **Status:** `200 OK`
+- **Body:**
+  ```json
+  { "response": "assistant reply text" }
+  ```
+
+**Errors**
+
+- `400 Bad Request` for empty messages or invalid session
+
+#### POST `/api/v1/chat/sessions/{session_id}/reset`
+
+Reset the chat context (clears history and summary, keeps system prompt).
+
+- **Status:** `204 No Content`
+- **Errors:** `400 Bad Request` on invalid session
+
+#### POST `/api/v1/chat/sessions/{session_id}/close`
+
+Close a chat session and remove its persisted data.
+
+- **Status:** `204 No Content`
+- **Errors:** `404 Not Found` if the session does not exist; `400 Bad Request` for other errors
+
+---
+
 ## Data Types
 
 ### LoginRequest

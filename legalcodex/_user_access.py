@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import NewType, Optional, Final, cast
 from dataclasses import dataclass, asdict, field
 
+
+from ._singleton import Singleton
 from ._types import JSON_DICT
 from .exceptions import UserNotFound
 
@@ -49,18 +51,11 @@ class User:
 
 
 
-class UsersAccess:
-
-    _instance = None
-
-    def __init__(self) -> None:
-        pass
+class UsersAccess(Singleton):
 
     @classmethod
     def get_instance(cls) -> UsersAccess:
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        return UsersAccess()
 
     def find(self, username: str) -> User:
         user = _MOCK_USER_DB.get(username)
@@ -82,11 +77,10 @@ def _hash_password(password:str)->PWHash:
     # Placeholder for password hashing logic
     return PWHash(password)
 
-
 _USERS :Final[list[User]] = [
-    User("test",_hash_password("hello"),[UserSGrp, ChatSGrp]),
-    User("sauvp",_hash_password("hello"),[AdminSGrp, UserSGrp, ChatSGrp]),
-    User("dan",_hash_password("ninja"),[UserSGrp]),
+    User("test",    _hash_password("hello"),[UserSGrp, ChatSGrp]),
+    User("sauvp",   _hash_password("hello"),[AdminSGrp, UserSGrp, ChatSGrp]),
+    User("dan",     _hash_password("ninja"),[UserSGrp]),
 ]
 
 _MOCK_USER_DB : Final[dict[str, User]] = {user.username: user for user in _USERS}

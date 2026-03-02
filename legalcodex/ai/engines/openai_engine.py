@@ -3,6 +3,8 @@ Represent an abstract AI API
 """
 from __future__ import annotations
 import os
+import sys
+import json
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -168,8 +170,17 @@ def _handle_exceptions()->Generator[None, None, None]:
 
 
 def _get_api_key()-> str:
-    key = os.environ.get(LC_API_KEY)
-    if not key:
-        raise LCException(f"API key not found. Please set the {LC_API_KEY} environment variable.")
-    return key
+    key = os.environ.get(LC_API_KEY, None)
+    if key is None:
+        if sys.platform == "win32" and os.path.exists("config.json"):
+            #Only during development, not secure for production
+            #look for config file in current directory
 
+            with open("config.json", "r") as file_handle:
+                config = json.load(file_handle)
+            key = config["openai_key"]
+            os.environ[LC_API_KEY] = key
+    if key is None:
+        raise LCException(f"API key not found. Please set the {LC_API_KEY} environment variable.")
+    assert isinstance(key, str), f"Expected API key to be a string, got {type(key)}"
+    return key

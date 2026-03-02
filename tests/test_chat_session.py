@@ -4,14 +4,15 @@ from datetime import datetime, timezone
 import os
 
 from legalcodex.ai.chat.chat_context import ChatContext
-from legalcodex.ai.chat.chat_session import ChatSession, ChatSessionId
-from legalcodex.ai.chat import chat_behaviour
-
+from legalcodex.ai.chat.chat_session import ChatSession
+from legalcodex.ai.chat._chat_types import ChatSessionId
 from legalcodex.ai.engines.mock_engine import MockEngine
 from legalcodex.ai.message import Message
 from legalcodex.exceptions import LCValueError
-from legalcodex._user_access import User, UsersAccess
+from legalcodex._user_access import UsersAccess
 
+
+USER = "test"
 
 
 MAX_MESSAGES = 10
@@ -66,7 +67,7 @@ class TestChatSession(unittest.TestCase):
 
         self.session.context.reset()
 
-        stream = chat_behaviour.send_message(self.session, "User0")
+        stream = self.session.send_message("User0")
         response :str = stream.all()
 
         self.assertEqual("0", response)
@@ -97,10 +98,8 @@ class TestChatSession(unittest.TestCase):
         self.assertEqual(list(self.session.context)[0].content, SYSTEM_PROMPT)
 
     def test_rejects_empty_user_message(self) -> None:
-
-
         with self.assertRaises(LCValueError):
-            chat_behaviour.send_message(self.session, "   ")
+            self.session.send_message("   ")
 
     def test_max_turns_trims_history(self) -> None:
 
@@ -111,7 +110,7 @@ class TestChatSession(unittest.TestCase):
 
         N = MAX_MESSAGES//2
         for i in range(N):
-            chat_behaviour.send_message(self.session, str(i)).all()
+            self.session.send_message(str(i)).all()
 
         self.assertEqual(self._mock_engine.count, N)
         self.assertEqual(len(list(self.session.context)), MAX_MESSAGES + 1) # N messages + system prompt
@@ -119,7 +118,7 @@ class TestChatSession(unittest.TestCase):
 
 
         # After MAX turns, the history should be trimmed to MAX messages
-        chat_behaviour.send_message(self.session, "Extra message").all()
+        self.session.send_message("Extra message").all()
 
         self.assertEqual(self._mock_engine.count, N + 2) # one for the extra message, one for the summary generation
 

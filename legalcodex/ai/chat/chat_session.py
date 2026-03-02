@@ -5,25 +5,25 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import TypeVar, Type, Optional, Any, Final, NewType, cast
+from typing import TypeVar, Type, Optional, Any, Final, NewType, cast, Callable, Iterator
 from uuid import uuid4
 
 from ...serialization import Serializable
-from ...exceptions import LCValueError
+from ...exceptions import LCValueError, LCException
 from ..._user_access import User, UsersAccess
 from ..._misc import serialize_datetime, parse_datetime
 from ..._schema import ChatSessionSchema
 
+from ..stream import Stream
 from ..engine import Engine
 from .._engine_selector import ENGINES, DEFAULT_ENGINE
 from ..engines._models import MODELS, DEFAULT_MODEL
 
 from .chat_context import ChatContext
+from ._chat_types import ChatSessionId
+from ..message import Message
 
 _logger = logging.getLogger(__name__)
-
-
-ChatSessionId = NewType("ChatSessionId", str)
 
 
 T = TypeVar("T", bound="ChatSession")
@@ -123,6 +123,35 @@ class ChatSession(Serializable[ChatSessionSchema]):
             engine=engine
         )
 
+
+
+    def send_message(self, user_message: str) -> Stream:
+        """
+        Send a user message to the char and get the assistant's response.
+            - The user message is appended to the context history.
+        """
+        prompt = user_message.strip()
+        if not prompt:
+            raise LCValueError("user_message must not be empty")
+
+        context = self._context
+
+
+        message = Message.User(prompt)
+        context.append(self._engine, message)
+
+        response = self._engine.run_messages_stream(context)
+
+        _logger.debug("Chat turn completed. History size=%d", len(context))
+
+        def on_end(content:str)->None:
+            message= Message(role="assistant", content=content)
+            context.append(self._engine, message)
+            _logger.debug("Appended assistant message to context: %s", message)
+
+        return _ChatStream(response, on_end)
+
+
     @classmethod
     def _new_session_id(cls) -> ChatSessionId:
         return cast(ChatSessionId, str(uuid4()))
@@ -144,3 +173,31 @@ def _get_engine(name:Optional[str],
     return engine_cls(model=model)
 
 
+_StreamEndCallback = Callable[[str], None]
+
+class _ChatStream(Stream):
+    """
+    A wrapper around the engine's response stream with
+    a callback for when the stream ends.
+    """
+    _stream:Optional[Stream]
+    _callback: _StreamEndCallback
+
+    def __init__(self, stream: Stream, callback:_StreamEndCallback):
+        self._stream = stream
+        self._callback = callback
+
+    def __iter__(self)-> Iterator[str]:
+        if self._stream is None:
+            raise LCException("Stream has already ended")
+
+        chunks:list[str] = []
+        try:
+            chunk:str
+            for chunk in self._stream:
+                chunks.append(chunk)
+                yield chunk
+        finally:
+            content = "".join(chunks)
+            self._callback(content)
+            self._stream = None # Mark stream as ended to prevent further iteration

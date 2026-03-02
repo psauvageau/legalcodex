@@ -2,13 +2,15 @@
 from __future__ import annotations
 import logging
 import threading
-from typing import Dict, cast
+from typing import Dict, cast, Iterator
 import os
 
+from ..._user_access import User
 from ..._misc import get_root_path
 from ...exceptions import ChatSessionNotFound
 from ..._singleton import Singleton
-from .chat_session import ChatSession, ChatSessionId
+from .chat_session import ChatSession
+from ._chat_types import ChatSessionInfo, ChatSessionId
 
 _logger = logging.getLogger(__name__)
 
@@ -25,6 +27,34 @@ class ChatSessionManager(Singleton):
         _logger.debug("Initializing ChatSessionManager:%s", id(self))
         self._sessions = {}
         self._lock = threading.RLock()
+
+
+
+    def get_sessions(self, user:User)->Iterator[ChatSessionInfo]:
+        """
+        Get a list of available chat sessions with their descriptions.
+
+        # TODO: Filter sessions based on user access permissions
+        # TODO: Manage description
+        """
+
+        with self._lock:
+            in_memory : set[ChatSessionId] = set()
+            for session in self._sessions.values():
+                in_memory.add(session.uid)
+                yield ChatSessionInfo(session_id=session.uid,
+                                      description="No messages yet")
+
+
+
+        path = get_path()
+        for filename in os.listdir(path):
+            if filename.endswith(".json"):
+                name, ext = os.path.splitext(filename)
+                session_id = ChatSessionId(name)
+                if not session_id in in_memory:
+                    yield ChatSessionInfo(session_id=session_id,
+                                          description="No messages yet")
 
     def add_session(self, session: ChatSession) -> None:
         """Add or replace a session keyed by its uid."""
@@ -57,13 +87,24 @@ class ChatSessionManager(Singleton):
             raise ChatSessionNotFound(session_id)
         return session
 
-    def save(self) -> None:
-        """Persist all chat sessions to disk under their uid."""
-
+    def close_session(self, session_id:ChatSessionId) -> None:
+        """
+        Close the session: remove it from memory and save it to disk.
+        """
         with self._lock:
-            for session in self._sessions.values():
-                _save_session(session)
-        _logger.debug("Saved chat sessions")
+            session = self._sessions.get(session_id, None)
+            if session is None:
+                raise ChatSessionNotFound(session_id)
+            del self._sessions[session_id]
+            _save_session(session)
+
+    #def save(self) -> None:
+    #    """Persist all chat sessions to disk under their uid."""
+    #
+    #    with self._lock:
+    #        for session in self._sessions.values():
+    #            _save_session(session)
+    #    _logger.debug("Saved chat sessions")
 
 def _save_session(session: ChatSession) -> None:
     """Save a single chat session to disk under its uid."""
@@ -82,8 +123,7 @@ def _save_session(session: ChatSession) -> None:
 
 def _load_session(session_id: ChatSessionId) -> ChatSession | None:
     """Load a single chat session from disk by its session id."""
-    path = get_path()
-    filename = os.path.join(path, f"{session_id}.json")
+    filename = _session_filename(session_id)
 
     if not os.path.isfile(filename):
         return None
@@ -107,3 +147,7 @@ def get_path() -> str:
     """
     root_path = get_root_path()
     return os.path.join(root_path, ".chat_sessions")
+
+
+def _session_filename(session_id: ChatSessionId) -> str:
+    return os.path.join(get_path(), f"{session_id}.json")

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from ..._user_access import UsersAccess
 from ..auth_service import create_access_token, verify_access_token, TokenPayload
+from .._require_user import ACCESS_COOKIE_NAME
 
 _logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def login(payload: LoginRequest, response: Response) -> None:
     )
 
     response.set_cookie(
-        key="lc_access",
+        key=ACCESS_COOKIE_NAME,
         value=token,
         httponly=True,
         samesite="lax",
@@ -61,7 +62,7 @@ def login(payload: LoginRequest, response: Response) -> None:
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(response: Response) -> None:
     response.delete_cookie(
-        key="lc_access",
+        key=ACCESS_COOKIE_NAME,
         path="/api/v1",
     )
     _logger.info("Logout completed")
@@ -76,7 +77,7 @@ def session(request: Request) -> dict[str, bool | str | list[str]] | JSONRespons
         - 200 with authenticated=true and user details if token is valid
         - 401 with authenticated=false if token is missing or invalid
     """
-    token = request.cookies.get("lc_access")
+    token = request.cookies.get(ACCESS_COOKIE_NAME)
 
     if not token:
         _logger.debug("Session check: no token cookie")
