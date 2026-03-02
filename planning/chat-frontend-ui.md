@@ -12,6 +12,87 @@
 - Use current chat routes in legalcodex/http_server/routes/chat.py (non-streaming responses): list sessions, create/open, send message (aggregated text), reset, close.
 - No attachments/uploads in this iteration.
 - Styling builds on existing light theme; no design system in place yet.
+- The `loading` and `unauthenticated` sections in index.html must remain unchanged; new markup is added only inside the `v-else` (authenticated) block.
+
+## File Map
+Files to create or modify (all under `frontend/`):
+
+| File | Role |
+|---|---|
+| `index.html` | **Modify** — add chat HTML template inside the existing authenticated `v-else` section; add `<script>` import for `chat-api.js` |
+| `styles.css` | **Modify** — append chat-specific rules; all new classes use the `chat-` prefix |
+| `js/auth-app.js` | **Modify** — add chat-related `data`, `methods`, and `mounted` hooks to the existing `createApp` instance |
+| `js/chat-api.js` | **Create** — standalone `async function` helpers for chat endpoints, following the same pattern as `apiLogin`/`apiLogout`/`apiCheckSession` in auth-app.js. Imported by auth-app.js via `import { ... } from "./chat-api.js"` |
+
+No new HTML pages or Vue components; everything stays in a single `createApp` call.
+
+## Vue Reactive State Shape
+Extend the existing `data()` in auth-app.js with:
+
+```js
+// --- chat state (added alongside existing auth state) ---
+sessions: [],               // Array<{ session_id: string, description: string|null }>
+currentSessionId: null,      // string | null
+messages: [],                // Array<{ role: 'user'|'assistant'|'system', content: string }>
+draft: '',                   // textarea v-model
+isSending: false,            // true while POST /messages is in-flight
+chatError: '',               // inline error string; cleared on next action
+sidebarOpen: true,           // toggle for responsive collapse
+```
+
+## HTML Skeleton (authenticated block)
+Replace the current authenticated `v-else` card body with:
+
+```html
+<section v-else class="chat-shell">
+  <!-- header -->
+  <header class="chat-header">
+    <button class="chat-sidebar-toggle" @click="sidebarOpen = !sidebarOpen">☰</button>
+    <h1>LegalCodex</h1>
+    <button @click="submitLogout" :disabled="isSubmitting">Sign out</button>
+  </header>
+
+  <div class="chat-body">
+    <!-- side panel -->
+    <aside v-show="sidebarOpen" class="chat-sidebar">
+      <button @click="createSession">+ New session</button>
+      <ul class="chat-session-list">
+        <li v-for="s in sessions" :key="s.session_id"
+            :class="{ active: s.session_id === currentSessionId }"
+            @click="openSession(s.session_id)">
+          {{ s.description || s.session_id }}
+        </li>
+      </ul>
+      <!-- reset / close actions for current session -->
+    </aside>
+
+    <!-- main pane -->
+    <div class="chat-main">
+      <div class="chat-messages" ref="messagesContainer">
+        <!-- empty state or message list -->
+      </div>
+
+      <!-- input bar (present from Task 1, disabled until Task 4 wires it) -->
+      <div class="chat-input-bar">
+        <textarea v-model="draft" :disabled="isSending" placeholder="Type a message…"
+                  @keydown.enter.exact.prevent="sendMessage"
+                  rows="1"></textarea>
+        <button @click="sendMessage" :disabled="isSending || !draft.trim()">Send</button>
+      </div>
+      <p v-if="chatError" class="chat-error">{{ chatError }}</p>
+    </div>
+  </div>
+</section>
+```
+
+## CSS Class Convention
+- All new classes use the `chat-` prefix (e.g., `chat-shell`, `chat-sidebar`, `chat-messages`, `chat-input-bar`, `chat-error`).
+- Append rules to `styles.css`; do not modify existing auth/card rules.
+
+## Scroll-to-Bottom Strategy
+- Use a Vue template ref (`ref="messagesContainer"`) on the `.chat-messages` div.
+- Before appending a new assistant message, check: `el.scrollTop + el.clientHeight >= el.scrollHeight - 40`. If true (user is near bottom), call `el.scrollTop = el.scrollHeight` after the DOM updates via `this.$nextTick()`.
+- A "jump to latest" button appears when the user has scrolled up.
 
 ## Layout
 - App shell: reuse current card-based shell; once authenticated, swap the card body to the chat UI (header with app name and logout button stays).
@@ -49,33 +130,41 @@
 - ARIA: labels on textarea, buttons (send/stop), session list items; live region for assistant responses.
 - Contrast: ensure readable backgrounds for bubbles and buttons per WCAG AA.
 
-## Open Questions / Next Steps
+## Implementation Tasks
 To keep work incremental and testable, tackle these tasks in order:
 
 1) **Scaffold chat shell**
-	- Extend authenticated view in frontend/index.html to render a chat layout placeholder (side panel + main pane) using existing Vue app and styles.css.
-	- Add minimal CSS for two-column layout and responsive collapse (no chat logic yet).
-	- Test: manual load → login → see layout frame.
+	- In `index.html`: replace the authenticated `v-else` card body with the chat shell HTML skeleton above (header, sidebar, main pane, input bar — all static/disabled).
+	- Create `js/chat-api.js` with empty placeholder exports for later tasks.
+	- In `js/auth-app.js`: import `chat-api.js`; add the new chat state properties to `data()` (all at defaults). No new methods yet beyond existing auth code.
+	- In `styles.css`: append `chat-*` rules for two-column layout, sidebar, main pane, input bar, and responsive collapse.
+	- Do **not** modify the `loading` or `unauthenticated` sections.
+	- Test: manual load → login → see layout frame with sidebar, empty main pane, and disabled input bar.
 
 2) **Session list wiring**
-	- Implement fetch of GET /api/v1/chat/sessions after successful session check; store sessions and current session_id.
-	- Render session list with create button; on create call POST /chat/sessions, update list/state; select first session by default.
+	- In `js/chat-api.js`: implement `apiListSessions()` and `apiCreateSession(opts)`.
+	- In `js/auth-app.js`: after `checkSession` resolves as authenticated, call `apiListSessions()` and store result in `sessions`; auto-select the first session and set `currentSessionId`.
+	- Wire the "+ New session" button to call `apiCreateSession({})`; push the returned `SessionInfo` into `sessions` and select it.
 	- Test: login → sessions load; create session adds to list; state persists during view lifecycle.
 
 3) **Load session context**
-	- On session select, call GET /chat/sessions/{id}/context; store system prompt, summary, history.
+	- In `js/chat-api.js`: implement `apiGetContext(sessionId)`.
+	- In `js/auth-app.js`: add `openSession(sessionId)` method; calls `apiGetContext`, maps returned `history` array to `messages`, sets `currentSessionId`.
 	- Render history as simple text rows (no markdown yet); auto-scroll to bottom on load.
 	- Test: switch between sessions and verify distinct histories.
 
 4) **Send message flow**
-	- Input bar: multiline textarea with Enter-to-send, Shift+Enter newline; disable while sending.
-	- POST /chat/sessions/{id}/messages; append user then assistant message; scroll to bottom.
+	- In `js/chat-api.js`: implement `apiSendMessage(sessionId, message)`.
+	- In `js/auth-app.js`: add `sendMessage()` method; sets `isSending = true`, pushes user message into `messages`, calls `apiSendMessage`, pushes assistant response, sets `isSending = false`. On error, set `chatError` and re-enable input.
+	- Input bar is already in DOM from Task 1; now enable its event bindings.
+	- Apply scroll-to-bottom strategy on assistant message arrival.
 	- Handle 400/404 with inline error state and re-enable input.
 	- Test: send message returns assistant text; errors surface and recover.
 
 5) **Reset/close actions**
-	- Add reset (POST /chat/sessions/{id}/reset) to clear context; add close (POST /chat/sessions/{id}/close) to remove or archive session.
-	- Update session list state accordingly.
+	- In `js/chat-api.js`: implement `apiResetContext(sessionId)` and `apiCloseSession(sessionId)`.
+	- In `js/auth-app.js`: add `resetSession()` (clears `messages`) and `closeSession()` (removes from `sessions`, selects next or creates new).
+	- Add reset/close buttons in sidebar under session list, visible when a session is selected.
 	- Test: reset clears history; close removes/archives and prevents further messages.
 
 6) **Markdown + formatting polish**
@@ -88,7 +177,7 @@ To keep work incremental and testable, tackle these tasks in order:
 	- Test: viewport resize; keyboard-only navigation through controls.
 
 8) **State persistence**
-	- Optionally store last session_id in localStorage and restore on load.
+	- Store last `session_id` in `localStorage` and restore on load.
 	- Test: reload after login → resumes last session.
 
 9) **Future streaming placeholder (optional)**
