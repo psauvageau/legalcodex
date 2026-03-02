@@ -5,14 +5,18 @@ import logging
 from typing import Final, Optional, Iterable, Type, TypeVar
 import json
 
-from ...exceptions import ValueError
+from ...exceptions import LCValueError
 from ..._types import JSON_DICT
+from ..._schema import ChatContextSchema
 
 from ..engine import Engine
 from ..message import Message
 from ..context import BaseContext
 
+
 from .chat_summarizer import summarize_overflow
+
+
 
 _logger = logging.getLogger(__name__)
 
@@ -23,26 +27,37 @@ class ChatContext(BaseContext):
     ChatContext manages the conversation history and system prompt for a chat session.
     It provides methods to get the full message history, append new messages, and trim the history to
     """
+    SCHEMA = ChatContextSchema
+
     _system_prompt: Final[Message]  # The system prompt that is always included at the beginning of the message history
     _max_messages: Final[int]       # maximum number of messages to keep in the history before trimming
     _trim_length: Final[int]        # number of messages to remove when trimming the history
 
     _history: list[Message]         # The main conversation history, excluding the system prompt and summary
     _summary: str                   # A summary of the messages that were removed from the history due to trimming
+    _is_dirty: bool                 # Indicates if the context has unsaved changes
 
     def __init__(self,  system_prompt: str,
                         max_messages: int,
-                        trim_length:Optional[int]=None) -> None:
+                        trim_length:Optional[int]=None,
+                        summary:Optional[str]=None,
+                        history:Optional[list[Message]]=None
+                        ) -> None:
 
         if max_messages <= 4:
-            raise ValueError("max_messages must be greater than 4 to allow for trimming")
+            raise LCValueError("max_messages must be greater than 4 to allow for trimming")
 
         self._system_prompt = Message("system", system_prompt.strip())
         self._max_messages = max_messages
         self._trim_length = max(trim_length if trim_length is not None else int(max_messages/2), 1)
 
-        self._history = []
-        self._summary = ""
+        self._history = history or []
+        self._summary = summary or ""
+        self._is_dirty = False
+
+    @property
+    def dirty(self) -> bool:
+        return self._is_dirty
 
     def reset(self)-> None:
         """
@@ -50,6 +65,7 @@ class ChatContext(BaseContext):
         """
         self._history = []
         self._summary = ""
+        self._is_dirty = True
 
 
     def get_messages(self) -> Iterable[Message]:
@@ -69,72 +85,34 @@ class ChatContext(BaseContext):
         """
         _logger.debug("Appending message to history: %s", message)
         self._history.append(message)
+        self._is_dirty = True
 
         if len(self._history) > self._max_messages:
             self._trim(engine)
 
-    def save(self, filename: str) -> None:
-        """
-        Save the current conversation context to a file.
-        """
-        _logger.info("Saving chat context to file: %s", filename)
-        content = self.serialize()
-        as_str = json.dumps(content, indent=2)
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(as_str)
-
     @classmethod
-    def load(cls:type[T], filename: str) -> T:
-        """
-        Load a conversation context from a file.
-        """
-
-
-        with open(filename, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return cls.deserialize(data)
-
-
-    @classmethod
-    def deserialize(cls: Type[T], data: JSON_DICT) -> T:
+    def deserialize(cls: Type[T], data:ChatContextSchema) -> T:
         """
         Deserialize a conversation context from a JSON dictionary.
         """
-        try:
-            #TODO: More validation
+        data
+        instance = cls( system_prompt=data.system_prompt,
+                        max_messages=data.max_messages,
+                        trim_length=data.trim_length,
+                        summary=data.summary,
+                        history=[Message.deserialize(msg) for msg in data.history])
+        return instance
 
-            system_prompt = Message.deserialize(data["system_prompt"]).content #type: ignore[arg-type]
-            max_messages = int(data["max_messages"])                           #type: ignore[arg-type]
-            trim_length = int(data["trim_length"])                             #type: ignore[arg-type]
-            instance = cls(
-                           system_prompt=system_prompt,
-                           max_messages=max_messages,
-                           trim_length=trim_length)
-
-            instance._summary = str(data["summary"])
-            instance._history = [Message.deserialize(msg) for msg in data["history"]] #type: ignore[arg-type, union-attr]
-
-            return instance
-
-        except Exception as err:
-            _logger.error("Failed to deserialize context from data: %s", data)
-            _logger.exception(err)
-            raise ValueError("Failed to deserialize context from data") from err
-
-
-
-    def serialize(self) -> JSON_DICT:
+    def serialize(self) -> ChatContextSchema:
         """
         Serialize the context to a JSON-serializable dictionary.
         """
-        return {
-            "system_prompt" : self._system_prompt.serialize(),
-            "max_messages"  : int(self._max_messages),
-            "trim_length"     : int(self._trim_length),
-            "summary"       : self._summary,
-            "history"       : [ msg.serialize() for msg in self._history ]
-        }
+        return self.SCHEMA (    system_prompt = self._system_prompt.content,
+                                max_messages =  int(self._max_messages),
+                                trim_length =  int(self._trim_length),
+                                summary =  self._summary,
+                                history = [ msg.serialize() for msg in self._history ]
+            )
 
     def _trim(self, engine:Engine) -> None:
         """
@@ -158,6 +136,7 @@ class ChatContext(BaseContext):
 
             self._history = keep
             self._summary = new_summary if new_summary else self._summary
+            self._is_dirty = True
 
 
 
@@ -166,6 +145,11 @@ class ChatContext(BaseContext):
             _logger.exception(err)
             _logger.warning("Trimming History without summarization. This may lead to loss of important context.")
             self._history = self._history[self._trim_length:]
+            self._is_dirty = True
+
+    def clear_dirty(self) -> None:
+        """Mark the context as clean after persisting changes."""
+        self._is_dirty = False
 
 
     def __eq__(self, other: object) -> bool:

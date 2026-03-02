@@ -6,7 +6,7 @@ class LCException(Exception):
     pass
 
 
-class ValueError(LCException):
+class LCValueError(LCException):
     """
     Exception raised for errors in the input value.
     """
@@ -27,3 +27,15 @@ class QuotaExceeded(LCException):
     """Exception raised when API quota is exceeded."""
     def __init__(self) -> None:
         super().__init__(f"API quota exceeded")
+
+
+
+class UserNotFound(LCException):
+    """Exception raised when a user is not found."""
+    def __init__(self, username: str) -> None:
+        super().__init__(f"User '{username}' not found")
+
+class ChatSessionNotFound(LCException):
+    """Exception raised when a chat session is not found."""
+    def __init__(self, session_id: str) -> None:
+        super().__init__(f"Chat session with id '{session_id}' not found")

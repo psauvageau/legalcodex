@@ -1,6 +1,25 @@
 # Release Notes
 
 
+# 0.0.3
+
+## Overview
+
+Adds a full HTTP chat API with session lifecycle support, a remote CLI for driving it, and refreshed auth/documentation coverage.
+
+## Details
+
+- Introduced JWT-backed auth service and `require_user` dependency to guard API routes with role-aware token verification.
+- Added chat HTTP endpoints for listing sessions, opening/creating sessions, sending messages, fetching context, resetting, and closing sessions (with chat context persisted on close).
+- Shipped `chat-remote` CLI command that logs in via the HTTP API, reuses or creates chat sessions, sends messages, and supports history/reset/exit controls.
+- Refactored chat session model/manager to persist engine/context metadata to disk and stream assistant replies, with a dedicated system prompt module and stronger singleton handling.
+- Expanded API references (Markdown and OpenAPI) plus new chat/auth HTTP tests to cover the updated surface.
+
+## Breaking Changes
+
+- None.
+
+
 # 0.0.2
 
 ## Overview

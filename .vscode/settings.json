@@ -18,7 +18,11 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "mypy": true
+        "mypy": true,
+        "/^python -m mypy --strict legalcodex$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     },
     "cSpell.words": [
         "behavior",
@@ -26,5 +30,6 @@
         "legalcodex",
         "monkeypatched",
         "Workstreams"
-    ]
+    ],
+    "terminal.integrated.shellIntegration.enabled": true
 }

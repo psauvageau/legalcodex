@@ -8,6 +8,7 @@ from contextlib import contextmanager
 
 from ._cli.cli_cmd import CliCmd
 from ._cli.cmd_chat import CommandChat
+from ._cli.cmd_chat_remote import CommandChatRemote
 from ._cli.cmd_serve import CommandServe
 from ._cli.cmd_test import CommandTest
 
@@ -19,6 +20,7 @@ from ._logs import init_log
 
 COMMANDS :List[Type[CliCmd]] = [
     CommandChat,
+    CommandChatRemote,
     CommandServe,
     CommandTest,
     # Add new command classes here
@@ -59,8 +61,6 @@ def _get_args(cmds:List[Type[CliCmd]]) -> argparse.Namespace:
         description="LegalCodex CLI Tool",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-
-    parser.add_argument('--config', '-c',action="store", type=str, default=None, help='Path to the config file')
     parser.add_argument('--verbose', '-v',action="store_true", help='Enable verbose output')
     parser.add_argument('--test',    '-t',action="store_true", help='Set Test Mode')
     parser.add_argument('--log-window',    '-l',action="store_true", help='Open the log window')

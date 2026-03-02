@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import logging
 import argparse
+import json
 import os
-from contextlib import closing
+from contextlib import closing, contextmanager
+from typing import Optional, Generator, Final, cast, Any
 
-from ..ai.chat.chat_behaviour import ChatBehaviour
-from ..ai.chat.chat_context import ChatContext
+from .._user_access import UsersAccess, User
+
+from ..ai.chat._chat_types import ChatSessionId
+from ..ai.chat.chat_session_manager import ChatSessionManager
+from ..ai.chat import chat_behaviour
 from ..ai.stream import Stream
-from ..exceptions import LCException
+from ..exceptions import LCException, ChatSessionNotFound
 
 from .engine_cmd import EngineCommand
 
@@ -16,72 +21,31 @@ from .engine_cmd import EngineCommand
 _logger = logging.getLogger(__name__)
 
 
-DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
+
 DEFAULT_MAX_TURN = 40
 
+CLI_SESSION_ID :Final[ChatSessionId] = ChatSessionId("cli-session")
 
-FILE_NAME = "chat_context.json"
 
 class CommandChat(EngineCommand):
     title: str = "chat"
 
-    def add_arguments(self, parser:argparse.ArgumentParser)->None:
-        """
-        Add command specific arguments to the parser
-        Override this method to add command specific arguments
-        """
-        super().add_arguments(parser)
-        parser.add_argument(
-            "--system",
-            type=str,
-            default=DEFAULT_SYSTEM_PROMPT,
-            help="Override the system prompt for this chat session",
-        )
-        parser.add_argument(
-            "--max-turns",
-            type=int,
-            default=DEFAULT_MAX_TURN,
-            help="Maximum number of user/assistant turns to keep in memory",
-        )
-
-        parser.add_argument("--no-load", action="store_true", help="Do not load chat history from a file")
-
-    def _get_chat_context(self, args: argparse.Namespace) -> ChatContext:
-
-        load = not args.no_load
-
-        if load:
-            if os.path.exists(FILE_NAME):
-                return ChatContext.load(FILE_NAME)
-            else:
-                _logger.warning("No existing chat context found, starting new session.")
-
-        chat = ChatContext( system_prompt=args.system,
-                            max_messages=args.max_turns)
-        return chat
-
-
     def run(self, args: argparse.Namespace) -> None:
-        super().run(args)
-        with closing(self.engine):
-
-            chat_context = self._get_chat_context(args)
-
-            chat = ChatBehaviour(self.engine, chat_context)
-
-            commands = ChatCommands(chat)
-
-            write("Starting interactive chat session. Type 'help' for commands.")
+        self.set_api_key()
+        session_id = get_session_id(args)
+        commands_processor = ChatCommandProcessor(session_id)
+        write("Starting interactive chat session. Type 'help' for commands.")
+        try:
             while True:
                 try:
+                    print("=============================")
                     prompt = input("You> ").strip()
                     if not prompt:
                         write("Please enter a message or type 'help'.")
                         continue
-
-                    commands.execute(prompt)
-
-                    stream = chat.send_message(prompt)
+                    print()
+                    commands_processor.execute(prompt)
+                    stream :Stream = chat_behaviour.send_message(session_id, prompt)
                     self.stream_handler(stream)
 
                 except CommandExecutedException:
@@ -92,28 +56,43 @@ class CommandChat(EngineCommand):
 
                 except (KeyboardInterrupt, ExitException):
                         write("Exiting chat session.")
-                        chat.context.save(FILE_NAME)
-
                         break
+        finally:
+            chat_behaviour.close_session(session_id)
 
 
+def get_session_id(args:argparse.Namespace)->ChatSessionId:
+    user = _get_user()
 
+    # Return the first available session for the user
+    for session_info in chat_behaviour.get_sessions(user):
+        return session_info.session_id
 
-
+    # If no session exists, create a new one with the CLI_SESSION_ID
+    return chat_behaviour.new_session(user=user,
+                               engine_name=args.engine,
+                               model=args.model)
 
 
 def write(msg:str)->None:
+    """
+    Handler for the chat response stream.
+    Writes the message to the console.
+    """
     _logger.info(msg)
     print(msg)
     print()
 
 
-class ChatCommands:
+
+class ChatCommandProcessor:
     """
     A wrapper for chat-related commands, providing common utilities and shared state.
     """
-    def __init__(self, chat:ChatBehaviour)->None:
-        self._chat = chat
+    _session_id : Final[ChatSessionId]
+
+    def __init__(self, chat:ChatSessionId)->None:
+        self._session_id = chat
 
         def exit()->None:
             raise ExitException()
@@ -123,15 +102,20 @@ class ChatCommands:
             write(f"Commands: {cmds}")
 
         def history()->None:
-            messages = self._chat.context.get_messages()
-            for msg in messages:
+            data = chat_behaviour.get_context(self._session_id)
+            for msg in data.context.history:
                 write(f"{msg.role}: {msg.content}")
+            print()
+
+        def reset()->None:
+            chat_behaviour.reset_context(self._session_id)
+            write("Chat context reset.")
 
         self._commands = {      "exit": exit,
                                 "quit": exit,
                                 "help": help,
                                 "history": history,
-                                "reset": self._chat.context.reset,
+                                "reset": reset,
                 }
 
     def execute(self, prompt:str)->None:
@@ -146,3 +130,7 @@ class CommandExecutedException(LCException):
 
 class ExitException(Exception):
     pass
+
+
+def _get_user()->User:
+    return UsersAccess.get_instance().find("test")

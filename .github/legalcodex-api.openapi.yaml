@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: LegalCodex API
+  description: >
+    RESTful API for legal document processing and analysis.
+    The API supports session-based authentication via HTTP-only cookies.
+  version: 1.0.0
+  contact:
+    name: LegalCodex Project
+  license:
+    name: Apache 2.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.legalcodex.example.com/api/v1
+    description: Production server (example)
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Status
+    description: Server health and status information
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user and establish session
+      description: >
+        Accepts username and password credentials and returns a session cookie.
+        The session cookie (lc_access) is set as HTTP-only and persists for
+        subsequent requests. The cookie path is /api/v1.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: sauvp
+              password: hello
+      responses:
+        '204':
+          description: Login successful; session cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Session cookie (lc_access=GRANTED)
+        '401':
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Unauthorized
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: End user session
+      description: >
+        Clears the session cookie (lc_access) and ends the authenticated session.
+        The cookie Max-Age is set to 0 to expire it immediately.
+      operationId: logoutUser
+      responses:
+        '204':
+          description: Logout successful; session cookie cleared
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Expired session cookie (lc_access=; Max-Age=0)
+      security:
+        - cookieAuth: []
+
+  /auth/session:
+    get:
+      tags:
+        - Authentication
+      summary: Check authentication status
+      description: >
+        Returns the current authentication status.
+        Returns 200 with authenticated=true if a valid session cookie is present,
+        otherwise returns 401 with authenticated=false.
+      operationId: checkSession
+      responses:
+        '200':
+          description: User is authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+              example:
+                authenticated: true
+        '401':
+          description: User is not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+              example:
+                authenticated: false
+      security:
+        - cookieAuth: []
+
+  /status:
+    get:
+      tags:
+        - Status
+      summary: Get server status
+      description: >
+        Returns the current server status and health information,
+        including the current working directory and ISO 8601 UTC timestamp.
+      operationId: getStatus
+      responses:
+        '200':
+          description: Server status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                status: ok
+                message: LegalCodex HTTP API server is running
+                cwd: /home/user/legalcodex
+                timestamp_utc: '2026-02-21T14:30:45.123456Z'
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: User identifier
+          example: sauvp
+        password:
+          type: string
+          minLength: 1
+          description: User password (plain text in request)
+          example: hello
+
+    SessionResponse:
+      type: object
+      required:
+        - authenticated
+      properties:
+        authenticated:
+          type: boolean
+          description: Whether the user has an active authenticated session
+          example: true
+
+    StatusResponse:
+      type: object
+      required:
+        - status
+        - message
+        - cwd
+        - timestamp_utc
+      properties:
+        status:
+          type: string
+          description: Server status indicator
+          enum:
+            - ok
+          example: ok
+        message:
+          type: string
+          description: Human-readable status message
+          example: LegalCodex HTTP API server is running
+        cwd:
+          type: string
+          description: Current working directory of the server process
+          example: /home/user/legalcodex
+        timestamp_utc:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC timestamp when status was retrieved
+          example: '2026-02-21T14:30:45.123456Z'
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message describing the issue
+          example: Unauthorized
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: lc_access
+      description: >
+        Session cookie that gets set after successful login.
+        This is an HTTP-only cookie scoped to /api/v1 paths.
+        The value must be "GRANTED".
+
+security: []

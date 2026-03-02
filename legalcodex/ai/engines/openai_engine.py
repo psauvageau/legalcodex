@@ -2,7 +2,9 @@
 Represent an abstract AI API
 """
 from __future__ import annotations
-
+import os
+import sys
+import json
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -13,12 +15,14 @@ from openai import OpenAI, RateLimitError
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat import ChatCompletionMessageParam
 
+from ...exceptions import LCException, QuotaExceeded
+from ..._misc import log_timer
+from ..._environ import LC_API_KEY
+
 from ..engine import Engine
 from ..context import Context
 from ..message import Message
 from ..stream import Stream
-from ...exceptions import LCException, QuotaExceeded
-from ..._misc import log_timer
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +30,7 @@ class OpenAIEngine(Engine):
     """
     An abstract AI engine interface.
     """
-    NAME : Final[str]  = "openai"
+    NAME : str  = "openai"
 
     #typing only
     _client         : Optional[OpenAI] = None
@@ -38,7 +42,7 @@ class OpenAIEngine(Engine):
         Get the OpenAI client, initializing it if necessary.
         """
         if self._client is None:
-            api_key:str = self.config.api_keys[self.NAME]
+            api_key:str = _get_api_key()
             self._client = OpenAI(api_key=api_key)
         return self._client
 
@@ -46,7 +50,6 @@ class OpenAIEngine(Engine):
     def run_messages_stream(self, context: Context) -> Stream:
         with _handle_exceptions():
             messages = _context_to_messages(context)
-
 
             with log_timer("OpenAI streaming response"):
                 stream = cast(
@@ -65,15 +68,6 @@ class OpenAIEngine(Engine):
         if self._token_counter is None:
             self._token_counter = TokenCounter()
         return self._token_counter
-
-    def close(self)->None:
-        """
-        Clean up any resources used by the engine.
-        Override this method if your engine needs to do any cleanup.
-        """
-        if self._token_counter is not None:
-            _logger.info("Total token usage for this session:")
-            self._token_counter.log_usage(logging.INFO)
 
 def _context_to_messages(context:Context)->list[ChatCompletionMessageParam]:
     """
@@ -172,3 +166,21 @@ def _handle_exceptions()->Generator[None, None, None]:
     except Exception as e:
         _logger.exception("OpenAI request failed")
         raise LCException("The AI request failed. Please try again.") from e
+
+
+
+def _get_api_key()-> str:
+    key = os.environ.get(LC_API_KEY, None)
+    if key is None:
+        if sys.platform == "win32" and os.path.exists("config.json"):
+            #Only during development, not secure for production
+            #look for config file in current directory
+
+            with open("config.json", "r") as file_handle:
+                config = json.load(file_handle)
+            key = config["openai_key"]
+            os.environ[LC_API_KEY] = key
+    if key is None:
+        raise LCException(f"API key not found. Please set the {LC_API_KEY} environment variable.")
+    assert isinstance(key, str), f"Expected API key to be a string, got {type(key)}"
+    return key
