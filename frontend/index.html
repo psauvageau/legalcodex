@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main id="app" class="app">
+    <main id="app" :class="['app', { 'app-chat': viewState === 'authenticated' }]">
       <section v-if="viewState === 'loading'" class="card">
         <h1>LegalCodex</h1>
         <p>Checking session…</p>
@@ -44,12 +44,50 @@
         </form>
       </section>
 
-      <section v-else class="card">
-        <h1>LegalCodex</h1>
-        <p>You are signed in.</p>
-        <button @click="submitLogout" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Signing out…' : 'Sign out' }}
-        </button>
+      <section v-else class="chat-shell">
+        <header class="chat-header">
+          <button
+            class="chat-sidebar-toggle"
+            @click="sidebarOpen = !sidebarOpen"
+            :disabled="isSending"
+          >
+            ☰
+          </button>
+          <h1>LegalCodex</h1>
+          <button @click="submitLogout" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Signing out…' : 'Sign out' }}
+          </button>
+        </header>
+
+        <!-- Main two-column workspace: left session panel + right conversation area -->
+        <div :class="['chat-body', { 'chat-body--sidebar-hidden': !sidebarOpen }]">
+          <aside v-show="sidebarOpen" class="chat-sidebar">
+            <button :disabled="true">+ New session</button>
+            <ul class="chat-session-list">
+              <li class="active">No sessions yet</li>
+            </ul>
+          </aside>
+
+          <!-- Right column card: conversation timeline + message composer -->
+          <div class="chat-main">
+            <!-- Scrollable conversation viewport (chat transcript appears here) -->
+            <div class="chat-messages" ref="messagesContainer">
+              <p class="chat-empty">Sign in complete. Chat setup is ready.</p>
+            </div>
+
+            <!-- Composer row: message textarea on the left, Send action on the right -->
+            <div class="chat-input-bar">
+              <textarea
+                v-model="draft"
+                :disabled="true"
+                placeholder="Type a message…"
+                rows="1"
+              ></textarea>
+              <button :disabled="true">Send</button>
+            </div>
+            <p v-if="chatError" class="chat-error">{{ chatError }}</p>
+          </div>
+        </div>
       </section>
     </main>
 
