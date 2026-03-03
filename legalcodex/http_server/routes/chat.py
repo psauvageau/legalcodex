@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
+from ..._schema import ChatContextSchema
 from ..._user_access import User
 from ...exceptions import LCException, ChatSessionNotFound
 from ...ai.chat import chat_behaviour
@@ -78,8 +78,8 @@ def create_session(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.get("/chat/sessions/{session_id}/context")
-def get_context(session_id: str, user: User = Depends(require_user)) -> Any:
+@router.get("/chat/sessions/{session_id}/context", response_model=ChatContextSchema)
+def get_context(session_id: str, user: User = Depends(require_user)) -> ChatContextSchema:
     try:
         return chat_behaviour.get_context(ChatSessionId(session_id))
     except LCException as exc:

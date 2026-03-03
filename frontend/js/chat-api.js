@@ -57,7 +57,11 @@ export async function apiGetContext(_sessionId) {
   });
 
   if (res.status === 200) {
-    return await res.json();
+    const data = await res.json();
+    if (!data || !Array.isArray(data.history)) {
+      throw new Error("Invalid chat context payload.");
+    }
+    return data;
   }
 
   let detail = "Failed to load chat context.";

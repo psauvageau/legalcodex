@@ -175,11 +175,7 @@ createApp({
 
       try {
         const context = await apiGetContext(sessionId);
-        const history = Array.isArray(context?.context?.history)
-          ? context.context.history
-          : Array.isArray(context?.history)
-            ? context.history
-            : [];
+        const history = context.history;
         this.messages = history
           .filter((entry) => typeof entry?.content === "string" && typeof entry?.role === "string")
           .map((entry) => ({ role: entry.role, content: entry.content }));

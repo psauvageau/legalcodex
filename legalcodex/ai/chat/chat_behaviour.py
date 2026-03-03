@@ -5,7 +5,7 @@ import logging
 from typing import Optional, Final, TypeVar, Callable, Iterator
 
 
-from ..._schema import ChatSessionSchema
+from ..._schema import ChatContextSchema
 from ..._types import JSON_DICT
 from ..._prompts import CHAT_SYSTEM_PROMPT
 from ..._user_access import User
@@ -87,13 +87,13 @@ def send_message(session_id:ChatSessionId,
 
 
 
-def get_context(session_id:ChatSessionId) -> ChatSessionSchema:
+def get_context(session_id:ChatSessionId) -> ChatContextSchema:
     """
     Get the current chat context for the given session id.
     """
     cm :ChatSessionManager = ChatSessionManager()
     session = cm.get_session(session_id)
-    return session.serialize()
+    return session.context.serialize()
 
 
 def reset_context(session_id:ChatSessionId) -> None:

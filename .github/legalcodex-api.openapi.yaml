@@ -199,7 +199,10 @@ paths:
       tags:
         - Chat
       summary: Get chat context
-      description: Retrieve the chat context (system prompt, summary, and history) for a session.
+      description: >
+        Retrieve only the chat context for a session (system prompt, summary,
+        and history). Session metadata such as uid, username, created_at, and
+        engine configuration is not returned by this endpoint.
       operationId: getChatContext
       security:
         - cookieAuth: []
@@ -216,6 +219,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatContext'
+              example:
+                system_prompt: You are a legal assistant.
+                max_messages: 20
+                trim_length: 10
+                summary: ''
+                history:
+                  - role: user
+                    content: Summarize this NDA in 3 bullets.
+                  - role: assistant
+                    content: 1) ... 2) ... 3) ...
         '404':
           description: Session not found
           content:

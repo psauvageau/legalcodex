@@ -198,7 +198,7 @@ class _RemoteChatCommandProcessor:
 
         def history_cmd() -> None:
             context = self._client.get_context(self._session_id)
-            history = context.get("context", {}).get("history", [])
+            history = context.get("history", [])
             for msg in history:
                 role = msg.get("role", "?")
                 content = msg.get("content", "")
