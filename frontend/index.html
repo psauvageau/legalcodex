@@ -90,11 +90,12 @@
             <div class="chat-input-bar">
               <textarea
                 v-model="draft"
-                :disabled="true"
+                :disabled="isSending"
                 placeholder="Type a message…"
+                @keydown.enter.exact.prevent="sendMessage"
                 rows="1"
               ></textarea>
-              <button :disabled="true">Send</button>
+              <button @click="sendMessage" :disabled="isSending || !draft.trim()">Send</button>
             </div>
             <p v-if="chatError" class="chat-error">{{ chatError }}</p>
           </div>

@@ -78,7 +78,32 @@ export async function apiGetContext(_sessionId) {
 }
 
 export async function apiSendMessage(_sessionId, _message) {
-  notImplemented("apiSendMessage");
+  const res = await fetch(`/api/v1/chat/sessions/${encodeURIComponent(_sessionId)}/messages`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: _message }),
+  });
+
+  if (res.status === 200) {
+    const data = await res.json();
+    if (!data || typeof data.response !== "string") {
+      throw new Error("Invalid send-message payload.");
+    }
+    return data;
+  }
+
+  let detail = "Failed to send message.";
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.detail === "string") {
+      detail = payload.detail;
+    }
+  } catch {
+    // Ignore parse errors and keep fallback message.
+  }
+
+  throw new Error(detail);
 }
 
 export async function apiResetContext(_sessionId) {

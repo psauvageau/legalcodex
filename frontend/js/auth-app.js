@@ -1,5 +1,5 @@
 import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-import { apiCreateSession, apiGetContext, apiListSessions } from "./chat-api.js";
+import { apiCreateSession, apiGetContext, apiListSessions, apiSendMessage } from "./chat-api.js";
 
 /**
  * POST /auth/login
@@ -168,6 +168,15 @@ createApp({
       container.scrollTop = container.scrollHeight;
     },
 
+    isNearMessagesBottom() {
+      const container = this.$refs.messagesContainer;
+      if (!container) {
+        return true;
+      }
+
+      return container.scrollTop + container.clientHeight >= container.scrollHeight - 40;
+    },
+
     async openSession(sessionId) {
       this.chatError = "";
       this.currentSessionId = sessionId;
@@ -183,6 +192,38 @@ createApp({
       } catch (err) {
         this.chatError = err instanceof Error ? err.message : "Unable to open session.";
         this.messages = [];
+      }
+    },
+
+    async sendMessage() {
+      const message = this.draft.trim();
+      if (!message || this.isSending) {
+        return;
+      }
+
+      if (!this.currentSessionId) {
+        this.chatError = "No active session selected.";
+        return;
+      }
+
+      this.chatError = "";
+      this.isSending = true;
+
+      this.messages = [...this.messages, { role: "user", content: message }];
+      this.draft = "";
+
+      try {
+        const response = await apiSendMessage(this.currentSessionId, message);
+        const shouldAutoScroll = this.isNearMessagesBottom();
+        this.messages = [...this.messages, { role: "assistant", content: response.response }];
+
+        if (shouldAutoScroll) {
+          await this.scrollMessagesToBottom();
+        }
+      } catch (err) {
+        this.chatError = err instanceof Error ? err.message : "Unable to send message.";
+      } finally {
+        this.isSending = false;
       }
     },
 
