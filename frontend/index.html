@@ -62,9 +62,17 @@
         <!-- Main two-column workspace: left session panel + right conversation area -->
         <div :class="['chat-body', { 'chat-body--sidebar-hidden': !sidebarOpen }]">
           <aside v-show="sidebarOpen" class="chat-sidebar">
-            <button :disabled="true">+ New session</button>
+            <button @click="createSession" :disabled="isSending || isSubmitting">+ New session</button>
             <ul class="chat-session-list">
-              <li class="active">No sessions yet</li>
+              <li
+                v-for="s in sessions"
+                :key="s.session_id"
+                :class="{ active: s.session_id === currentSessionId }"
+                @click="currentSessionId = s.session_id"
+              >
+                {{ s.description || s.session_id }}
+              </li>
+              <li v-if="!sessions.length">No sessions yet</li>
             </ul>
           </aside>
 

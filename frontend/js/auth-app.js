@@ -1,7 +1,5 @@
 import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-// Side-effect import to ensure chat API module is loaded early.
-// This keeps module wiring in place while chat methods are added incrementally.
-import "./chat-api.js";
+import { apiCreateSession, apiListSessions } from "./chat-api.js";
 
 /**
  * POST /auth/login
@@ -93,6 +91,15 @@ createApp({
   },
 
   methods: {
+    resetChatState() {
+      this.sessions = [];
+      this.currentSessionId = null;
+      this.messages = [];
+      this.draft = "";
+      this.isSending = false;
+      this.chatError = "";
+    },
+
     /**
      * Clears only auth error text.
      * Keep this narrowly scoped to avoid hiding unrelated chat errors.
@@ -109,6 +116,46 @@ createApp({
       this.viewState = "loading";
       const authenticated = await apiCheckSession();
       this.viewState = authenticated ? "authenticated" : "unauthenticated";
+
+      if (authenticated) {
+        await this.loadSessions();
+      } else {
+        this.resetChatState();
+      }
+    },
+
+    async loadSessions() {
+      this.chatError = "";
+
+      try {
+        const sessions = await apiListSessions();
+        this.sessions = Array.isArray(sessions) ? sessions : [];
+
+        if (this.sessions.length === 0) {
+          const createdSession = await apiCreateSession({});
+          this.sessions = [createdSession];
+          this.currentSessionId = createdSession.session_id;
+          return;
+        }
+
+        this.currentSessionId = this.sessions[0].session_id;
+      } catch (err) {
+        this.chatError = err instanceof Error ? err.message : "Unable to load sessions.";
+        this.sessions = [];
+        this.currentSessionId = null;
+      }
+    },
+
+    async createSession() {
+      this.chatError = "";
+
+      try {
+        const createdSession = await apiCreateSession({});
+        this.sessions = [...this.sessions, createdSession];
+        this.currentSessionId = createdSession.session_id;
+      } catch (err) {
+        this.chatError = err instanceof Error ? err.message : "Unable to create session.";
+      }
     },
 
     /**
@@ -124,6 +171,7 @@ createApp({
         // Minimize sensitive data retention in reactive memory.
         this.form.password = "";
         this.viewState = "authenticated";
+        await this.loadSessions();
       } catch (err) {
         this.errorMessage = err instanceof Error ? err.message : "Login failed.";
       } finally {
@@ -143,6 +191,7 @@ createApp({
         await apiLogout();
       } finally {
         this.isSubmitting = false;
+        this.resetChatState();
         this.viewState = "unauthenticated";
       }
     },
