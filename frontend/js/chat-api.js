@@ -51,7 +51,26 @@ export async function apiCreateSession(options = {}) {
 }
 
 export async function apiGetContext(_sessionId) {
-  notImplemented("apiGetContext");
+  const res = await fetch(`/api/v1/chat/sessions/${encodeURIComponent(_sessionId)}/context`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (res.status === 200) {
+    return await res.json();
+  }
+
+  let detail = "Failed to load chat context.";
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.detail === "string") {
+      detail = payload.detail;
+    }
+  } catch {
+    // Ignore parse errors and keep fallback message.
+  }
+
+  throw new Error(detail);
 }
 
 export async function apiSendMessage(_sessionId, _message) {

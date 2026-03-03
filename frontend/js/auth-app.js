@@ -1,5 +1,5 @@
 import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-import { apiCreateSession, apiListSessions } from "./chat-api.js";
+import { apiCreateSession, apiGetContext, apiListSessions } from "./chat-api.js";
 
 /**
  * POST /auth/login
@@ -134,11 +134,11 @@ createApp({
         if (this.sessions.length === 0) {
           const createdSession = await apiCreateSession({});
           this.sessions = [createdSession];
-          this.currentSessionId = createdSession.session_id;
+          await this.openSession(createdSession.session_id);
           return;
         }
 
-        this.currentSessionId = this.sessions[0].session_id;
+        await this.openSession(this.sessions[0].session_id);
       } catch (err) {
         this.chatError = err instanceof Error ? err.message : "Unable to load sessions.";
         this.sessions = [];
@@ -152,9 +152,41 @@ createApp({
       try {
         const createdSession = await apiCreateSession({});
         this.sessions = [...this.sessions, createdSession];
-        this.currentSessionId = createdSession.session_id;
+        await this.openSession(createdSession.session_id);
       } catch (err) {
         this.chatError = err instanceof Error ? err.message : "Unable to create session.";
+      }
+    },
+
+    async scrollMessagesToBottom() {
+      await this.$nextTick();
+      const container = this.$refs.messagesContainer;
+      if (!container || typeof container.scrollHeight !== "number") {
+        return;
+      }
+
+      container.scrollTop = container.scrollHeight;
+    },
+
+    async openSession(sessionId) {
+      this.chatError = "";
+      this.currentSessionId = sessionId;
+      this.messages = [];
+
+      try {
+        const context = await apiGetContext(sessionId);
+        const history = Array.isArray(context?.context?.history)
+          ? context.context.history
+          : Array.isArray(context?.history)
+            ? context.history
+            : [];
+        this.messages = history
+          .filter((entry) => typeof entry?.content === "string" && typeof entry?.role === "string")
+          .map((entry) => ({ role: entry.role, content: entry.content }));
+        await this.scrollMessagesToBottom();
+      } catch (err) {
+        this.chatError = err instanceof Error ? err.message : "Unable to open session.";
+        this.messages = [];
       }
     },
 

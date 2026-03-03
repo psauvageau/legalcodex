@@ -68,7 +68,7 @@
                 v-for="s in sessions"
                 :key="s.session_id"
                 :class="{ active: s.session_id === currentSessionId }"
-                @click="currentSessionId = s.session_id"
+                @click="openSession(s.session_id)"
               >
                 {{ s.description || s.session_id }}
               </li>
@@ -80,7 +80,10 @@
           <div class="chat-main">
             <!-- Scrollable conversation viewport (chat transcript appears here) -->
             <div class="chat-messages" ref="messagesContainer">
-              <p class="chat-empty">Sign in complete. Chat setup is ready.</p>
+              <template v-if="messages.length">
+                <p v-for="(m, idx) in messages" :key="idx"><strong>{{ m.role }}:</strong> {{ m.content }}</p>
+              </template>
+              <p v-else class="chat-empty">No messages yet for this session.</p>
             </div>
 
             <!-- Composer row: message textarea on the left, Send action on the right -->

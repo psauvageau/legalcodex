@@ -57,7 +57,7 @@ class ChatSessionManager(Singleton):
                 session_id = ChatSessionId(name)
                 if not session_id in in_memory:
                     yield ChatSessionInfo(session_id=session_id,
-                                          description=session_id[0:16])
+                                          description=session_id[0:8])
 
     def add_session(self, session: ChatSession) -> None:
         """Add or replace a session keyed by its uid."""
