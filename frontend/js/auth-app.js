@@ -106,6 +106,30 @@ createApp({
   },
 
   methods: {
+    isNarrowViewport() {
+      return window.matchMedia("(max-width: 860px)").matches;
+    },
+
+    toggleSidebar() {
+      this.sidebarOpen = !this.sidebarOpen;
+    },
+
+    closeSidebar() {
+      this.sidebarOpen = false;
+    },
+
+    closeSidebarOnMobile() {
+      if (this.isNarrowViewport()) {
+        this.closeSidebar();
+      }
+    },
+
+    onGlobalKeydown(event) {
+      if (event.key === "Escape" && this.sidebarOpen && this.isNarrowViewport()) {
+        this.closeSidebar();
+      }
+    },
+
     setChatError(message) {
       this.chatError = message;
       this.showToast(message);
@@ -451,6 +475,7 @@ createApp({
           .map((entry, index) => this.createMessage(entry.role, entry.content, Date.now() + index));
         await this.decorateCodeBlocks();
         await this.scrollMessagesToBottom();
+        this.closeSidebarOnMobile();
       } catch (err) {
         this.setChatError(err instanceof Error ? err.message : "Unable to open session.");
         this.messages = [];
@@ -535,6 +560,11 @@ createApp({
    * Used to bootstrap auth state before user interaction.
    */
   async mounted() {
+    window.addEventListener("keydown", this.onGlobalKeydown);
     await this.checkSession();
+  },
+
+  unmounted() {
+    window.removeEventListener("keydown", this.onGlobalKeydown);
   },
 }).mount("#app");

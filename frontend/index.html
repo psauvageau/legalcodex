@@ -48,35 +48,77 @@
         <header class="chat-header">
           <button
             class="chat-sidebar-toggle"
-            @click="sidebarOpen = !sidebarOpen"
+            @click="toggleSidebar"
             :disabled="isSending"
+            :aria-label="sidebarOpen ? 'Close sessions panel' : 'Open sessions panel'"
+            :aria-expanded="sidebarOpen ? 'true' : 'false'"
+            aria-controls="chat-sidebar"
           >
             ☰
           </button>
           <h1>LegalCodex</h1>
-          <button @click="submitLogout" :disabled="isSubmitting">
+          <button @click="submitLogout" :disabled="isSubmitting" aria-label="Sign out">
             {{ isSubmitting ? 'Signing out…' : 'Sign out' }}
           </button>
         </header>
 
         <!-- Main two-column workspace: left session panel + right conversation area -->
         <div :class="['chat-body', { 'chat-body--sidebar-hidden': !sidebarOpen }]">
-          <aside v-show="sidebarOpen" class="chat-sidebar">
-            <button @click="createSession" :disabled="isSending || isSubmitting">+ New session</button>
-            <ul class="chat-session-list">
+          <button
+            type="button"
+            class="chat-sidebar-backdrop"
+            :class="{ 'chat-sidebar-backdrop--open': sidebarOpen }"
+            @click="closeSidebar"
+            aria-label="Close sessions panel"
+          ></button>
+
+          <aside
+            id="chat-sidebar"
+            class="chat-sidebar"
+            :class="{ 'chat-sidebar--open': sidebarOpen }"
+            aria-label="Chat sessions"
+          >
+            <button
+              @click="createSession"
+              :disabled="isSending || isSubmitting"
+              aria-label="Create new session"
+            >
+              + New session
+            </button>
+            <ul class="chat-session-list" role="list" aria-label="Session list">
               <li
                 v-for="s in sessions"
                 :key="s.session_id"
                 :class="{ active: s.session_id === currentSessionId }"
-                @click="openSession(s.session_id)"
               >
-                {{ s.description || s.session_id }}
+                <button
+                  type="button"
+                  class="chat-session-button"
+                  :class="{ active: s.session_id === currentSessionId }"
+                  :aria-current="s.session_id === currentSessionId ? 'true' : null"
+                  :aria-label="`Open session ${s.description || s.session_id}`"
+                  @click="openSession(s.session_id)"
+                >
+                  {{ s.description || s.session_id }}
+                </button>
               </li>
               <li v-if="!sessions.length">No sessions yet</li>
             </ul>
             <div v-if="currentSessionId" class="chat-session-actions">
-              <button @click="resetSession" :disabled="isSending || isSubmitting">Reset session</button>
-              <button @click="closeSession" :disabled="isSending || isSubmitting">Close session</button>
+              <button
+                @click="resetSession"
+                :disabled="isSending || isSubmitting"
+                aria-label="Reset current session"
+              >
+                Reset session
+              </button>
+              <button
+                @click="closeSession"
+                :disabled="isSending || isSubmitting"
+                aria-label="Close current session"
+              >
+                Close session
+              </button>
             </div>
           </aside>
 
@@ -114,10 +156,17 @@
                 v-model="draft"
                 :disabled="isSending"
                 placeholder="Type a message…"
+                aria-label="Chat message"
                 @keydown.enter.exact.prevent="sendMessage"
                 rows="1"
               ></textarea>
-              <button @click="sendMessage" :disabled="isSending || !draft.trim()">Send</button>
+              <button
+                @click="sendMessage"
+                :disabled="isSending || !draft.trim()"
+                aria-label="Send message"
+              >
+                Send
+              </button>
             </div>
             <p v-if="chatError" class="chat-error">{{ chatError }}</p>
           </div>

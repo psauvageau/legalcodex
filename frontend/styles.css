@@ -99,6 +99,7 @@ button:disabled {
   grid-template-columns: 260px 1fr;
   gap: 0.75rem;
   min-height: 420px;
+  position: relative;
 }
 
 .chat-body.chat-body--sidebar-hidden {
@@ -112,6 +113,10 @@ button:disabled {
   background: #f9fafb;
 }
 
+.chat-sidebar-backdrop {
+  display: none;
+}
+
 .chat-session-list {
   margin: 0.7rem 0 0 0;
   padding: 0;
@@ -119,15 +124,32 @@ button:disabled {
 }
 
 .chat-session-list li {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  padding: 0.45rem 0.55rem;
   margin-bottom: 0.45rem;
 }
 
-.chat-session-list li.active {
+.chat-session-button {
+  width: 100%;
+  margin: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+}
+
+.chat-session-button.active {
   border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.chat-session-list li.active .chat-session-button {
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.chat-session-list li:last-child {
+  margin-bottom: 0.45rem;
 }
 
 .chat-main {
@@ -247,6 +269,11 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem;
   align-items: center;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding-top: 0.4rem;
+  background: #fff;
 }
 
 .chat-input-bar textarea {
@@ -271,12 +298,70 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.chat-shell button:focus-visible,
+.chat-shell textarea:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
 @media (max-width: 860px) {
   .app-chat {
     max-width: 700px;
+    padding: 0.65rem;
+  }
+
+  .chat-shell {
+    padding: 0.65rem;
   }
 
   .chat-body {
     grid-template-columns: 1fr;
+    min-height: 65vh;
+    overflow: hidden;
+  }
+
+  .chat-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(84vw, 320px);
+    border-radius: 0 10px 10px 0;
+    transform: translateX(-102%);
+    transition: transform 160ms ease;
+    z-index: 30;
+    box-shadow: 0 2px 12px rgba(17, 24, 39, 0.06);
+    overflow: auto;
+  }
+
+  .chat-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .chat-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background: rgba(17, 24, 39, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+    z-index: 20;
+  }
+
+  .chat-sidebar-backdrop--open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-main {
+    min-height: 65vh;
+  }
+
+  .chat-input-bar {
+    padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
   }
 }
