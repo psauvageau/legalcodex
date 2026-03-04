@@ -13,6 +13,7 @@ import {
 
 marked.setOptions({ gfm: true, breaks: true });
 const logger = createLogger("chat-ui");
+const LAST_SESSION_ID_KEY = "legalcodex:last_session_id";
 
 /**
  * POST /auth/login
@@ -127,6 +128,31 @@ createApp({
     onGlobalKeydown(event) {
       if (event.key === "Escape" && this.sidebarOpen && this.isNarrowViewport()) {
         this.closeSidebar();
+      }
+    },
+
+    getLastSessionId() {
+      try {
+        return localStorage.getItem(LAST_SESSION_ID_KEY);
+      } catch {
+        logger.warn("Unable to read last session from localStorage");
+        return null;
+      }
+    },
+
+    setLastSessionId(sessionId) {
+      try {
+        localStorage.setItem(LAST_SESSION_ID_KEY, sessionId);
+      } catch {
+        logger.warn("Unable to persist last session to localStorage", { sessionId });
+      }
+    },
+
+    clearLastSessionId() {
+      try {
+        localStorage.removeItem(LAST_SESSION_ID_KEY);
+      } catch {
+        logger.warn("Unable to clear last session in localStorage");
       }
     },
 
@@ -339,6 +365,8 @@ createApp({
         clearTimeout(this.toastTimerId);
         this.toastTimerId = null;
       }
+
+      this.clearLastSessionId();
     },
 
     /**
@@ -379,7 +407,15 @@ createApp({
           return;
         }
 
-        await this.openSession(this.sessions[0].session_id);
+        const persistedSessionId = this.getLastSessionId();
+        const hasPersistedSession =
+          typeof persistedSessionId === "string" &&
+          this.sessions.some((session) => session.session_id === persistedSessionId);
+        const preferredSessionId = hasPersistedSession
+          ? persistedSessionId
+          : this.sessions[0].session_id;
+
+        await this.openSession(preferredSessionId);
       } catch (err) {
         this.setChatError(err instanceof Error ? err.message : "Unable to load sessions.");
         this.sessions = [];
@@ -475,6 +511,7 @@ createApp({
           .map((entry, index) => this.createMessage(entry.role, entry.content, Date.now() + index));
         await this.decorateCodeBlocks();
         await this.scrollMessagesToBottom();
+        this.setLastSessionId(sessionId);
         this.closeSidebarOnMobile();
       } catch (err) {
         this.setChatError(err instanceof Error ? err.message : "Unable to open session.");
