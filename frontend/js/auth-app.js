@@ -1,5 +1,18 @@
 import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js";
-import { apiCreateSession, apiGetContext, apiListSessions, apiSendMessage } from "./chat-api.js";
+import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
+import DOMPurify from "https://cdn.jsdelivr.net/npm/dompurify@3.2.6/+esm";
+import { createLogger } from "./logger.js";
+import {
+  apiCloseSession,
+  apiCreateSession,
+  apiGetContext,
+  apiListSessions,
+  apiResetContext,
+  apiSendMessage,
+} from "./chat-api.js";
+
+marked.setOptions({ gfm: true, breaks: true });
+const logger = createLogger("chat-ui");
 
 /**
  * POST /auth/login
@@ -86,11 +99,210 @@ createApp({
       draft: "",
       isSending: false,
       chatError: "",
+      chatToast: "",
+      toastTimerId: null,
       sidebarOpen: true,
     };
   },
 
   methods: {
+    setChatError(message) {
+      this.chatError = message;
+      this.showToast(message);
+    },
+
+    showToast(message) {
+      this.chatToast = message;
+      if (this.toastTimerId) {
+        clearTimeout(this.toastTimerId);
+      }
+
+      this.toastTimerId = setTimeout(() => {
+        this.chatToast = "";
+        this.toastTimerId = null;
+      }, 2500);
+    },
+
+    formatRole(role) {
+      if (role === "assistant") return "Assistant";
+      if (role === "system") return "System";
+      return "User";
+    },
+
+    formatTimestamp(timestampMs) {
+      return new Date(timestampMs).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    /**
+     * Render a raw chat message as safe HTML for display in `v-html`.
+     *
+     * Intention:
+     * - Convert Markdown authored by user/assistant into presentable HTML.
+     * - Sanitize generated HTML so untrusted content cannot inject scripts.
+     * - Add a copy-action wrapper around fenced code blocks for UX consistency.
+     *
+     * Preconditions:
+     * - `content` is expected to be a string (or null/undefined, treated as empty).
+     * - `marked` is configured and available.
+     * - `DOMPurify` is available and should sanitize all generated markup.
+     *
+     * Postconditions (returned document shape):
+     * - Returns a sanitized HTML string safe to bind with `v-html`.
+     * - Fenced code blocks are wrapped as:
+     *   `<div class="chat-code-block"><button class="chat-copy-code">Copy</button><pre><code>...</code></pre></div>`
+     * - Non-code Markdown remains standard sanitized HTML (`p`, `ul`, `em`, etc.).
+     */
+    renderMarkdown(content) {
+      const rawHtml = marked.parse(content ?? "");
+      const sanitizedHtml = DOMPurify.sanitize(rawHtml);
+      const template = document.createElement("template");
+      template.innerHTML = sanitizedHtml;
+
+      // Select every <code> element that is a direct child of <pre>,
+      // i.e. fenced code blocks rendered by Markdown as <pre><code>...</code></pre>.
+      const preCodeBlocks = template.content.querySelectorAll("pre > code");
+      preCodeBlocks.forEach((codeElement) => {
+        const preElement = codeElement.parentElement;
+        if (!preElement) {
+          logger.debug("Skipping code block without <pre> parent", { codeElement });
+          return;
+        }
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "chat-code-block";
+
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "chat-copy-code";
+        copyButton.textContent = "Copy";
+
+        preElement.replaceWith(wrapper);
+        wrapper.append(copyButton, preElement);
+      });
+
+      const withCopyButtons = template.innerHTML;
+
+      logger.debug("Rendered markdown", {
+        hasCodeFence: /```/.test(content ?? ""),
+        hasPreTag: preCodeBlocks.length > 0,
+        hasCopyButton: template.content.querySelectorAll(".chat-copy-code").length > 0,
+      });
+
+      return withCopyButtons;
+    },
+
+    /**
+     * Ensure rendered message HTML contains copy controls for fenced code blocks.
+     *
+     * Intention:
+     * - Post-process already-rendered chat message DOM and wrap each `<pre>`
+     *   inside `.chat-message-content` with a `.chat-code-block` container.
+     * - Inject a `.chat-copy-code` button so users can copy block content.
+     *
+     * Preconditions:
+     * - Vue has rendered message content (`v-html`) into the document.
+     * - This method is called after message list updates (hence `await this.$nextTick()`).
+     *
+     * Postconditions:
+     * - Every eligible `<pre>` is wrapped once (idempotent behavior).
+     * - Existing wrapped blocks are left untouched.
+     */
+    async decorateCodeBlocks() {
+      await this.$nextTick();
+
+      const root = this.$el;
+      if (!(root instanceof HTMLElement)) {
+        return;
+      }
+
+      const codeBlocks = root.querySelectorAll(".chat-message-content pre");
+      logger.debug("Decorating code blocks", { preCount: codeBlocks.length });
+      codeBlocks.forEach((preElement) => {
+        if (!(preElement instanceof HTMLElement)) {
+          return;
+        }
+
+        if (preElement.parentElement?.classList.contains("chat-code-block")) {
+          return;
+        }
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "chat-code-block";
+
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "chat-copy-code";
+        copyButton.textContent = "Copy";
+
+        preElement.replaceWith(wrapper);
+        wrapper.append(copyButton, preElement);
+      });
+
+      logger.debug("Code block decoration done", {
+        wrapperCount: root.querySelectorAll(".chat-code-block").length,
+        copyButtonCount: root.querySelectorAll(".chat-copy-code").length,
+      });
+    },
+
+    createMessage(role, content, timestampMs = Date.now()) {
+      return {
+        id: `${timestampMs}-${Math.random().toString(36).slice(2)}`,
+        role,
+        content,
+        rendered: this.renderMarkdown(content),
+        timestampMs,
+      };
+    },
+
+    /**
+     * Handle delegated clicks inside rendered message HTML.
+     *
+     * Intention:
+     * - Intercept clicks on `.chat-copy-code` buttons embedded in message content.
+     * - Copy the associated `<code>` block text to the clipboard.
+     *
+     * Preconditions:
+     * - `event` originates from `.chat-message-content`.
+     * - Copy buttons follow the structure created by markdown decoration
+     *   (`.chat-copy-code` within `.chat-code-block` containing `<code>`).
+     *
+     * Postconditions:
+     * - On success: code text is copied and button text briefly changes to `Copied!`.
+     * - On failure: no exception escapes; a warning is logged and a toast is shown.
+     */
+    async onMessageContentClick(event) {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const button = target.closest(".chat-copy-code");
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const codeBlock = button.parentElement?.querySelector("code");
+      if (!(codeBlock instanceof HTMLElement)) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(codeBlock.innerText);
+        logger.info("Copied code block to clipboard");
+        const originalText = button.textContent;
+        button.textContent = "Copied!";
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 900);
+      } catch {
+        logger.warn("Clipboard copy failed");
+        this.showToast("Copy failed.");
+      }
+    },
+
     resetChatState() {
       this.sessions = [];
       this.currentSessionId = null;
@@ -98,6 +310,11 @@ createApp({
       this.draft = "";
       this.isSending = false;
       this.chatError = "";
+      this.chatToast = "";
+      if (this.toastTimerId) {
+        clearTimeout(this.toastTimerId);
+        this.toastTimerId = null;
+      }
     },
 
     /**
@@ -140,7 +357,7 @@ createApp({
 
         await this.openSession(this.sessions[0].session_id);
       } catch (err) {
-        this.chatError = err instanceof Error ? err.message : "Unable to load sessions.";
+        this.setChatError(err instanceof Error ? err.message : "Unable to load sessions.");
         this.sessions = [];
         this.currentSessionId = null;
       }
@@ -154,7 +371,51 @@ createApp({
         this.sessions = [...this.sessions, createdSession];
         await this.openSession(createdSession.session_id);
       } catch (err) {
-        this.chatError = err instanceof Error ? err.message : "Unable to create session.";
+        this.setChatError(err instanceof Error ? err.message : "Unable to create session.");
+      }
+    },
+
+    async resetSession() {
+      if (!this.currentSessionId || this.isSending) {
+        return;
+      }
+
+      this.chatError = "";
+
+      try {
+        await apiResetContext(this.currentSessionId);
+        this.messages = [];
+      } catch (err) {
+        this.setChatError(err instanceof Error ? err.message : "Unable to reset session.");
+      }
+    },
+
+    async closeSession() {
+      if (!this.currentSessionId || this.isSending) {
+        return;
+      }
+
+      this.chatError = "";
+      const closingSessionId = this.currentSessionId;
+
+      try {
+        await apiCloseSession(closingSessionId);
+
+        const remainingSessions = this.sessions.filter((s) => s.session_id !== closingSessionId);
+        this.sessions = remainingSessions;
+        this.messages = [];
+        this.currentSessionId = null;
+
+        if (remainingSessions.length > 0) {
+          await this.openSession(remainingSessions[0].session_id);
+          return;
+        }
+
+        const createdSession = await apiCreateSession({});
+        this.sessions = [createdSession];
+        await this.openSession(createdSession.session_id);
+      } catch (err) {
+        this.setChatError(err instanceof Error ? err.message : "Unable to close session.");
       }
     },
 
@@ -187,10 +448,11 @@ createApp({
         const history = context.history;
         this.messages = history
           .filter((entry) => typeof entry?.content === "string" && typeof entry?.role === "string")
-          .map((entry) => ({ role: entry.role, content: entry.content }));
+          .map((entry, index) => this.createMessage(entry.role, entry.content, Date.now() + index));
+        await this.decorateCodeBlocks();
         await this.scrollMessagesToBottom();
       } catch (err) {
-        this.chatError = err instanceof Error ? err.message : "Unable to open session.";
+        this.setChatError(err instanceof Error ? err.message : "Unable to open session.");
         this.messages = [];
       }
     },
@@ -202,26 +464,28 @@ createApp({
       }
 
       if (!this.currentSessionId) {
-        this.chatError = "No active session selected.";
+        this.setChatError("No active session selected.");
         return;
       }
 
       this.chatError = "";
       this.isSending = true;
 
-      this.messages = [...this.messages, { role: "user", content: message }];
+      this.messages = [...this.messages, this.createMessage("user", message)];
       this.draft = "";
+      await this.decorateCodeBlocks();
 
       try {
         const response = await apiSendMessage(this.currentSessionId, message);
         const shouldAutoScroll = this.isNearMessagesBottom();
-        this.messages = [...this.messages, { role: "assistant", content: response.response }];
+        this.messages = [...this.messages, this.createMessage("assistant", response.response)];
+        await this.decorateCodeBlocks();
 
         if (shouldAutoScroll) {
           await this.scrollMessagesToBottom();
         }
       } catch (err) {
-        this.chatError = err instanceof Error ? err.message : "Unable to send message.";
+        this.setChatError(err instanceof Error ? err.message : "Unable to send message.");
       } finally {
         this.isSending = false;
       }

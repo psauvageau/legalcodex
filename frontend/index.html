@@ -74,16 +74,38 @@
               </li>
               <li v-if="!sessions.length">No sessions yet</li>
             </ul>
+            <div v-if="currentSessionId" class="chat-session-actions">
+              <button @click="resetSession" :disabled="isSending || isSubmitting">Reset session</button>
+              <button @click="closeSession" :disabled="isSending || isSubmitting">Close session</button>
+            </div>
           </aside>
 
           <!-- Right column card: conversation timeline + message composer -->
           <div class="chat-main">
+            <p v-if="chatToast" class="chat-toast" role="status" aria-live="polite">{{ chatToast }}</p>
+
             <!-- Scrollable conversation viewport (chat transcript appears here) -->
             <div class="chat-messages" ref="messagesContainer">
               <template v-if="messages.length">
-                <p v-for="(m, idx) in messages" :key="idx"><strong>{{ m.role }}:</strong> {{ m.content }}</p>
+                <article
+                  v-for="m in messages"
+                  :key="m.id"
+                  :class="['chat-message', `chat-message--${m.role}`]"
+                >
+                  <header class="chat-message-meta">
+                    <strong>{{ formatRole(m.role) }}</strong>
+                    <time>{{ formatTimestamp(m.timestampMs) }}</time>
+                  </header>
+                  <div
+                    class="chat-message-content"
+                    @click="onMessageContentClick"
+                    v-html="m.rendered"
+                  ></div>
+                </article>
               </template>
-              <p v-else class="chat-empty">No messages yet for this session.</p>
+              <p v-else class="chat-empty">
+                Start the conversation. Press Enter to send and Shift+Enter for a new line.
+              </p>
             </div>
 
             <!-- Composer row: message textarea on the left, Send action on the right -->

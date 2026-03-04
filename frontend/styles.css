@@ -138,6 +138,17 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  position: relative;
+}
+
+.chat-toast {
+  margin: 0;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
 }
 
 .chat-messages {
@@ -152,6 +163,83 @@ button:disabled {
 .chat-empty {
   margin: 0;
   color: #6b7280;
+}
+
+.chat-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.6rem;
+}
+
+.chat-message--user {
+  background: #f9fafb;
+}
+
+.chat-message--assistant {
+  background: #f0f9ff;
+}
+
+.chat-message--system {
+  background: #fffbeb;
+}
+
+.chat-message-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  color: #374151;
+  font-size: 0.82rem;
+}
+
+.chat-message-content {
+  color: #111827;
+  line-height: 1.45;
+}
+
+.chat-message-content p {
+  margin: 0.45rem 0;
+}
+
+.chat-message-content pre {
+  margin: 0;
+  overflow: auto;
+  background: #111827;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 0.7rem;
+}
+
+.chat-message-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.chat-message-content :not(pre) > code {
+  background: #f3f4f6;
+  color: #111827;
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+}
+
+.chat-code-block {
+  border: 1px solid #374151;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0.45rem 0;
+}
+
+.chat-copy-code {
+  margin: 0;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  padding: 0.35rem 0.55rem;
+  text-align: right;
+  font-size: 0.82rem;
+  background: #1f2937;
+  color: #f9fafb;
 }
 
 .chat-input-bar {

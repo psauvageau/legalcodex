@@ -107,9 +107,47 @@ export async function apiSendMessage(_sessionId, _message) {
 }
 
 export async function apiResetContext(_sessionId) {
-  notImplemented("apiResetContext");
+  const res = await fetch(`/api/v1/chat/sessions/${encodeURIComponent(_sessionId)}/reset`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (res.status === 204) {
+    return;
+  }
+
+  let detail = "Failed to reset chat context.";
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.detail === "string") {
+      detail = payload.detail;
+    }
+  } catch {
+    // Ignore parse errors and keep fallback message.
+  }
+
+  throw new Error(detail);
 }
 
 export async function apiCloseSession(_sessionId) {
-  notImplemented("apiCloseSession");
+  const res = await fetch(`/api/v1/chat/sessions/${encodeURIComponent(_sessionId)}/close`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (res.status === 204) {
+    return;
+  }
+
+  let detail = "Failed to close chat session.";
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.detail === "string") {
+      detail = payload.detail;
+    }
+  } catch {
+    // Ignore parse errors and keep fallback message.
+  }
+
+  throw new Error(detail);
 }
