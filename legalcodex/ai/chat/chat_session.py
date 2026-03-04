@@ -59,6 +59,10 @@ class ChatSession(Serializable[ChatSessionSchema]):
         return self._engine
 
     @property
+    def description(self)->str:
+        return self._context.summary
+
+    @property
     def context(self) -> ChatContext:
         return self._context
 

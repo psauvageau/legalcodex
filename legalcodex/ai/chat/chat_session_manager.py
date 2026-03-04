@@ -43,18 +43,21 @@ class ChatSessionManager(Singleton):
             for session in self._sessions.values():
                 in_memory.add(session.uid)
                 yield ChatSessionInfo(session_id=session.uid,
-                                      description="No messages yet")
+                                      description=session.description)
 
 
 
         path = get_path()
+        if not os.path.isdir(path):
+            return
+
         for filename in os.listdir(path):
             if filename.endswith(".json"):
                 name, ext = os.path.splitext(filename)
                 session_id = ChatSessionId(name)
                 if not session_id in in_memory:
                     yield ChatSessionInfo(session_id=session_id,
-                                          description="No messages yet")
+                                          description=session_id[0:8])
 
     def add_session(self, session: ChatSession) -> None:
         """Add or replace a session keyed by its uid."""

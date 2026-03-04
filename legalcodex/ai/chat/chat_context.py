@@ -59,6 +59,10 @@ class ChatContext(BaseContext):
     def dirty(self) -> bool:
         return self._is_dirty
 
+    @property
+    def summary(self) -> str:
+        return self._summary
+
     def reset(self)-> None:
         """
         Reset the conversation context, clearing the history and summary but keeping the system prompt.

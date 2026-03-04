@@ -103,7 +103,7 @@ class ChatCommandProcessor:
 
         def history()->None:
             data = chat_behaviour.get_context(self._session_id)
-            for msg in data.context.history:
+            for msg in data.history:
                 write(f"{msg.role}: {msg.content}")
             print()
 
