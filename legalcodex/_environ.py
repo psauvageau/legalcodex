@@ -14,3 +14,5 @@ LC_FRONTEND_PATH :Final[str] = "LC_FRONTEND_PATH"
 
 # JWT secret key for token signing (development fallback in auth_service.py)
 LC_JWT_SECRET :Final[str] = "LC_JWT_SECRET"
+
+LC_DATABASE_URL :Final[str] = "LC_DATABASE_URL"
