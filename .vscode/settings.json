@@ -22,7 +22,8 @@
         "/^python -m mypy --strict legalcodex$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "git tag": true
     },
     "cSpell.words": [
         "behavior",

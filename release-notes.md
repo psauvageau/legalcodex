@@ -1,6 +1,25 @@
 # Release Notes
 
 
+# 0.0.4
+
+## Overview
+
+Adds a production-ready chat frontend workflow with session persistence, accessibility/responsive improvements, and aligned backend/API updates.
+
+## Details
+
+- Added frontend chat API and logging modules, integrated into the authenticated app flow for session lifecycle operations.
+- Added chat UI support for listing/creating/opening sessions, sending/rendering messages, and persisting the active session ID in `localStorage`.
+- Improved UI responsiveness and accessibility, including sidebar behavior, keyboard navigation, and sticky chat header layout.
+- Improved backend chat session/context handling in HTTP routes and chat session manager/context components for clearer state and error paths.
+- Updated CLI remote chat integration and API documentation/OpenAPI artifacts to reflect the expanded chat surface.
+
+## Breaking Changes
+
+- None.
+
+
 # 0.0.3
 
 ## Overview
